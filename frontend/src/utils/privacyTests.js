@@ -1,0 +1,680 @@
+// Privacy Test Utilities - Fully Functional Browser Privacy Detection
+
+// Helper to generate hash from string
+const hashString = async (str) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// 1. IP Address Detection
+export const testIPAddress = async () => {
+    try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        
+        // Also try to get IPv6
+        let ipv6 = null;
+        try {
+            const v6Response = await fetch('https://api64.ipify.org?format=json');
+            const v6Data = await v6Response.json();
+            if (v6Data.ip !== data.ip) {
+                ipv6 = v6Data.ip;
+            }
+        } catch (e) {
+            // IPv6 not available
+        }
+        
+        return {
+            status: 'leak',
+            summary: 'Your IP address is visible',
+            details: {
+                ipv4: data.ip,
+                ipv6: ipv6,
+                exposed: true
+            }
+        };
+    } catch (error) {
+        return {
+            status: 'unknown',
+            summary: 'Could not detect IP',
+            details: { error: error.message }
+        };
+    }
+};
+
+// 2. WebRTC Leak Test
+export const testWebRTC = () => {
+    return new Promise((resolve) => {
+        const ips = {
+            local: [],
+            public: [],
+            ipv6: []
+        };
+        
+        if (!window.RTCPeerConnection) {
+            resolve({
+                status: 'safe',
+                summary: 'WebRTC not supported',
+                details: { supported: false }
+            });
+            return;
+        }
+        
+        const pc = new RTCPeerConnection({
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        });
+        
+        pc.createDataChannel('');
+        
+        pc.createOffer().then(offer => pc.setLocalDescription(offer));
+        
+        const timeout = setTimeout(() => {
+            pc.close();
+            const hasLeak = ips.local.length > 0 || ips.public.length > 0;
+            resolve({
+                status: hasLeak ? 'leak' : 'safe',
+                summary: hasLeak ? 'WebRTC is leaking IPs' : 'WebRTC is not leaking IPs',
+                details: {
+                    supported: true,
+                    localIPs: ips.local,
+                    publicIPs: ips.public,
+                    ipv6: ips.ipv6,
+                    leaking: hasLeak
+                }
+            });
+        }, 3000);
+        
+        pc.onicecandidate = (event) => {
+            if (!event.candidate) return;
+            
+            const candidate = event.candidate.candidate;
+            const ipRegex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
+            const ipv6Regex = /([a-f0-9]{1,4}(:[a-f0-9]{1,4}){7}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){0,7}::[a-f0-9]{0,4}(:[a-f0-9]{1,4}){0,7})/i;
+            
+            const ipMatch = candidate.match(ipRegex);
+            const ipv6Match = candidate.match(ipv6Regex);
+            
+            if (ipMatch) {
+                const ip = ipMatch[0];
+                if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+                    if (!ips.local.includes(ip)) ips.local.push(ip);
+                } else {
+                    if (!ips.public.includes(ip)) ips.public.push(ip);
+                }
+            }
+            
+            if (ipv6Match) {
+                const ip = ipv6Match[0];
+                if (!ips.ipv6.includes(ip)) ips.ipv6.push(ip);
+            }
+        };
+    });
+};
+
+// 3. Canvas Fingerprinting
+export const testCanvas = async () => {
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200;
+        canvas.height = 50;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw various elements to create unique fingerprint
+        ctx.textBaseline = 'top';
+        ctx.font = "14px 'Arial'";
+        ctx.fillStyle = '#f60';
+        ctx.fillRect(0, 0, 62, 20);
+        ctx.fillStyle = '#069';
+        ctx.fillText('Browseraintyourfriend', 2, 15);
+        ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+        ctx.fillText('Canvas Test', 4, 17);
+        
+        // Add some shapes
+        ctx.beginPath();
+        ctx.arc(100, 25, 15, 0, Math.PI * 2);
+        ctx.fillStyle = '#e74c3c';
+        ctx.fill();
+        
+        const dataUrl = canvas.toDataURL();
+        const hash = await hashString(dataUrl);
+        
+        return {
+            status: 'leak',
+            summary: 'Canvas fingerprint is unique',
+            details: {
+                hash: hash.substring(0, 32) + '...',
+                fullHash: hash,
+                supported: true,
+                uniqueIdentifier: true
+            }
+        };
+    } catch (error) {
+        return {
+            status: 'unknown',
+            summary: 'Canvas test failed',
+            details: { error: error.message }
+        };
+    }
+};
+
+// 4. WebGL Fingerprinting
+export const testWebGL = () => {
+    try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        
+        if (!gl) {
+            return {
+                status: 'safe',
+                summary: 'WebGL not supported',
+                details: { supported: false }
+            };
+        }
+        
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        const vendor = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : 'Unknown';
+        const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Unknown';
+        
+        const params = {
+            version: gl.getParameter(gl.VERSION),
+            shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+            vendor: gl.getParameter(gl.VENDOR),
+            renderer: gl.getParameter(gl.RENDERER),
+            unmaskedVendor: vendor,
+            unmaskedRenderer: renderer,
+            maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+            maxViewportDims: gl.getParameter(gl.MAX_VIEWPORT_DIMS)
+        };
+        
+        return {
+            status: 'leak',
+            summary: `GPU: ${renderer.substring(0, 40)}${renderer.length > 40 ? '...' : ''}`,
+            details: {
+                supported: true,
+                ...params,
+                exposes: ['GPU model', 'Driver version', 'Hardware capabilities']
+            }
+        };
+    } catch (error) {
+        return {
+            status: 'unknown',
+            summary: 'WebGL test failed',
+            details: { error: error.message }
+        };
+    }
+};
+
+// 5. JavaScript / Browser Information
+export const testJavaScript = () => {
+    const nav = navigator;
+    
+    const details = {
+        userAgent: nav.userAgent,
+        platform: nav.platform,
+        language: nav.language,
+        languages: nav.languages ? [...nav.languages] : [nav.language],
+        cookiesEnabled: nav.cookieEnabled,
+        doNotTrack: nav.doNotTrack || window.doNotTrack || nav.msDoNotTrack,
+        hardwareConcurrency: nav.hardwareConcurrency || 'Unknown',
+        maxTouchPoints: nav.maxTouchPoints || 0,
+        deviceMemory: nav.deviceMemory || 'Unknown',
+        pdfViewerEnabled: nav.pdfViewerEnabled,
+        webdriver: nav.webdriver,
+        plugins: Array.from(nav.plugins || []).map(p => p.name).slice(0, 10),
+        mimeTypes: Array.from(nav.mimeTypes || []).map(m => m.type).slice(0, 10)
+    };
+    
+    return {
+        status: 'leak',
+        summary: `${details.platform} - ${details.hardwareConcurrency} cores`,
+        details
+    };
+};
+
+// 6. Screen Information
+export const testScreen = () => {
+    const screen = window.screen;
+    
+    const details = {
+        width: screen.width,
+        height: screen.height,
+        availWidth: screen.availWidth,
+        availHeight: screen.availHeight,
+        colorDepth: screen.colorDepth,
+        pixelDepth: screen.pixelDepth,
+        devicePixelRatio: window.devicePixelRatio,
+        orientation: screen.orientation?.type || 'Unknown',
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight
+    };
+    
+    return {
+        status: 'leak',
+        summary: `${details.width}x${details.height} @ ${details.devicePixelRatio}x`,
+        details
+    };
+};
+
+// 7. Font Detection
+export const testFonts = async () => {
+    const baseFonts = ['monospace', 'sans-serif', 'serif'];
+    const testFonts = [
+        'Arial', 'Arial Black', 'Comic Sans MS', 'Courier New', 'Georgia',
+        'Impact', 'Lucida Console', 'Lucida Sans Unicode', 'Palatino Linotype',
+        'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana',
+        'Monaco', 'Menlo', 'Consolas', 'DejaVu Sans', 'Liberation Sans',
+        'Helvetica', 'Helvetica Neue', 'SF Pro', 'Segoe UI', 'Roboto',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Open Sans'
+    ];
+    
+    const testString = 'mmmmmmmmmmlli';
+    const testSize = '72px';
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    const getWidth = (fontFamily) => {
+        ctx.font = `${testSize} ${fontFamily}`;
+        return ctx.measureText(testString).width;
+    };
+    
+    const baseWidths = {};
+    baseFonts.forEach(font => {
+        baseWidths[font] = getWidth(font);
+    });
+    
+    const detectedFonts = [];
+    
+    testFonts.forEach(font => {
+        let detected = false;
+        for (const baseFont of baseFonts) {
+            const testWidth = getWidth(`'${font}', ${baseFont}`);
+            if (testWidth !== baseWidths[baseFont]) {
+                detected = true;
+                break;
+            }
+        }
+        if (detected) {
+            detectedFonts.push(font);
+        }
+    });
+    
+    const hash = await hashString(detectedFonts.join(','));
+    
+    return {
+        status: 'leak',
+        summary: `${detectedFonts.length} fonts detected`,
+        details: {
+            count: detectedFonts.length,
+            fonts: detectedFonts,
+            hash: hash.substring(0, 16),
+            uniqueIdentifier: true
+        }
+    };
+};
+
+// 8. Audio Fingerprint
+export const testAudio = async () => {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) {
+            return {
+                status: 'safe',
+                summary: 'AudioContext not supported',
+                details: { supported: false }
+            };
+        }
+        
+        const context = new AudioContext();
+        const oscillator = context.createOscillator();
+        const analyser = context.createAnalyser();
+        const gainNode = context.createGain();
+        const scriptProcessor = context.createScriptProcessor(4096, 1, 1);
+        
+        gainNode.gain.value = 0; // Mute
+        oscillator.type = 'triangle';
+        oscillator.frequency.value = 10000;
+        
+        oscillator.connect(analyser);
+        analyser.connect(scriptProcessor);
+        scriptProcessor.connect(gainNode);
+        gainNode.connect(context.destination);
+        
+        oscillator.start(0);
+        
+        const fingerprint = await new Promise((resolve) => {
+            scriptProcessor.onaudioprocess = (event) => {
+                const data = event.inputBuffer.getChannelData(0);
+                const sum = data.reduce((acc, val) => acc + Math.abs(val), 0);
+                oscillator.stop();
+                context.close();
+                resolve(sum);
+            };
+        });
+        
+        const hash = await hashString(fingerprint.toString());
+        
+        return {
+            status: 'leak',
+            summary: 'Audio fingerprint generated',
+            details: {
+                supported: true,
+                sampleRate: context.sampleRate,
+                hash: hash.substring(0, 16),
+                uniqueIdentifier: true
+            }
+        };
+    } catch (error) {
+        return {
+            status: 'unknown',
+            summary: 'Audio test failed',
+            details: { error: error.message }
+        };
+    }
+};
+
+// 9. Geolocation Test
+export const testGeolocation = () => {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            resolve({
+                status: 'safe',
+                summary: 'Geolocation not supported',
+                details: { supported: false }
+            });
+            return;
+        }
+        
+        // Check permissions
+        if (navigator.permissions) {
+            navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+                resolve({
+                    status: result.state === 'granted' ? 'leak' : 
+                           result.state === 'denied' ? 'safe' : 'warning',
+                    summary: result.state === 'granted' ? 'Location access granted' :
+                            result.state === 'denied' ? 'Location access denied' :
+                            'Location permission not set',
+                    details: {
+                        supported: true,
+                        permissionState: result.state,
+                        canTrack: result.state === 'granted'
+                    }
+                });
+            }).catch(() => {
+                resolve({
+                    status: 'warning',
+                    summary: 'Location permission unknown',
+                    details: { supported: true, permissionState: 'unknown' }
+                });
+            });
+        } else {
+            resolve({
+                status: 'warning',
+                summary: 'Permission API not supported',
+                details: { supported: true, permissionState: 'unknown' }
+            });
+        }
+    });
+};
+
+// 10. Timezone Detection
+export const testTimezone = () => {
+    const tz = Intl.DateTimeFormat().resolvedOptions();
+    const offset = new Date().getTimezoneOffset();
+    
+    return {
+        status: 'leak',
+        summary: tz.timeZone,
+        details: {
+            timezone: tz.timeZone,
+            offset: offset,
+            offsetString: `UTC${offset > 0 ? '-' : '+'}${Math.abs(offset / 60)}`,
+            locale: tz.locale,
+            calendar: tz.calendar
+        }
+    };
+};
+
+// 11. Do Not Track
+export const testDoNotTrack = () => {
+    const dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    const gpc = navigator.globalPrivacyControl;
+    
+    const dntEnabled = dnt === '1' || dnt === 'yes';
+    const gpcEnabled = gpc === true;
+    
+    return {
+        status: (dntEnabled || gpcEnabled) ? 'safe' : 'leak',
+        summary: (dntEnabled || gpcEnabled) ? 'Privacy signals enabled' : 'No privacy signals',
+        details: {
+            doNotTrack: dnt,
+            dntEnabled,
+            globalPrivacyControl: gpc,
+            gpcEnabled,
+            recommendation: !dntEnabled && !gpcEnabled ? 'Consider enabling DNT or GPC' : null
+        }
+    };
+};
+
+// 12. Battery Status
+export const testBattery = async () => {
+    try {
+        if (!navigator.getBattery) {
+            return {
+                status: 'safe',
+                summary: 'Battery API not supported',
+                details: { supported: false }
+            };
+        }
+        
+        const battery = await navigator.getBattery();
+        
+        return {
+            status: 'leak',
+            summary: `${Math.round(battery.level * 100)}% ${battery.charging ? '(charging)' : ''}`,
+            details: {
+                supported: true,
+                level: battery.level,
+                charging: battery.charging,
+                chargingTime: battery.chargingTime,
+                dischargingTime: battery.dischargingTime,
+                canTrack: true
+            }
+        };
+    } catch (error) {
+        return {
+            status: 'safe',
+            summary: 'Battery API blocked',
+            details: { supported: false, blocked: true }
+        };
+    }
+};
+
+// 13. Network Information
+export const testNetwork = () => {
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    
+    if (!connection) {
+        return {
+            status: 'safe',
+            summary: 'Network API not supported',
+            details: { supported: false }
+        };
+    }
+    
+    return {
+        status: 'leak',
+        summary: `${connection.effectiveType || 'Unknown'} connection`,
+        details: {
+            supported: true,
+            effectiveType: connection.effectiveType,
+            downlink: connection.downlink,
+            rtt: connection.rtt,
+            saveData: connection.saveData,
+            type: connection.type
+        }
+    };
+};
+
+// 14. Client Hints
+export const testClientHints = async () => {
+    const hints = {};
+    
+    // Check for user agent data
+    if (navigator.userAgentData) {
+        hints.brands = navigator.userAgentData.brands;
+        hints.mobile = navigator.userAgentData.mobile;
+        hints.platform = navigator.userAgentData.platform;
+        
+        try {
+            const highEntropyValues = await navigator.userAgentData.getHighEntropyValues([
+                'architecture', 'bitness', 'model', 'platformVersion', 'fullVersionList'
+            ]);
+            hints.highEntropy = highEntropyValues;
+        } catch (e) {
+            hints.highEntropyError = e.message;
+        }
+        
+        return {
+            status: 'leak',
+            summary: 'Client Hints available',
+            details: {
+                supported: true,
+                ...hints
+            }
+        };
+    }
+    
+    return {
+        status: 'safe',
+        summary: 'Client Hints not supported',
+        details: { supported: false }
+    };
+};
+
+// 15. Storage APIs
+export const testStorage = () => {
+    const storage = {
+        localStorage: false,
+        sessionStorage: false,
+        indexedDB: false,
+        cookies: false
+    };
+    
+    // Test localStorage
+    try {
+        localStorage.setItem('test', 'test');
+        localStorage.removeItem('test');
+        storage.localStorage = true;
+    } catch (e) {}
+    
+    // Test sessionStorage
+    try {
+        sessionStorage.setItem('test', 'test');
+        sessionStorage.removeItem('test');
+        storage.sessionStorage = true;
+    } catch (e) {}
+    
+    // Test IndexedDB
+    storage.indexedDB = !!window.indexedDB;
+    
+    // Test cookies
+    storage.cookies = navigator.cookieEnabled;
+    
+    const trackingCapable = Object.values(storage).some(v => v);
+    
+    return {
+        status: trackingCapable ? 'leak' : 'safe',
+        summary: trackingCapable ? 'Storage APIs available' : 'Storage APIs blocked',
+        details: storage
+    };
+};
+
+// 16. Media Devices
+export const testMediaDevices = async () => {
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+            return {
+                status: 'safe',
+                summary: 'Media Devices API not supported',
+                details: { supported: false }
+            };
+        }
+        
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        
+        const grouped = {
+            audioinput: devices.filter(d => d.kind === 'audioinput').length,
+            audiooutput: devices.filter(d => d.kind === 'audiooutput').length,
+            videoinput: devices.filter(d => d.kind === 'videoinput').length
+        };
+        
+        return {
+            status: 'leak',
+            summary: `${grouped.videoinput} cameras, ${grouped.audioinput} mics`,
+            details: {
+                supported: true,
+                ...grouped,
+                total: devices.length,
+                canFingerprint: true
+            }
+        };
+    } catch (error) {
+        return {
+            status: 'safe',
+            summary: 'Media Devices blocked',
+            details: { supported: true, blocked: true }
+        };
+    }
+};
+
+// Run all tests
+export const runAllTests = async () => {
+    const tests = [
+        { id: 'ip', name: 'IP Address', icon: 'globe', test: testIPAddress },
+        { id: 'webrtc', name: 'WebRTC', icon: 'video', test: testWebRTC },
+        { id: 'canvas', name: 'Canvas Fingerprint', icon: 'palette', test: testCanvas },
+        { id: 'webgl', name: 'WebGL', icon: 'cpu', test: testWebGL },
+        { id: 'javascript', name: 'Browser Info', icon: 'code', test: testJavaScript },
+        { id: 'screen', name: 'Screen Info', icon: 'monitor', test: testScreen },
+        { id: 'fonts', name: 'Font Detection', icon: 'type', test: testFonts },
+        { id: 'audio', name: 'Audio Fingerprint', icon: 'music', test: testAudio },
+        { id: 'geolocation', name: 'Geolocation', icon: 'mapPin', test: testGeolocation },
+        { id: 'timezone', name: 'Timezone', icon: 'clock', test: testTimezone },
+        { id: 'dnt', name: 'Do Not Track', icon: 'eyeOff', test: testDoNotTrack },
+        { id: 'battery', name: 'Battery Status', icon: 'battery', test: testBattery },
+        { id: 'network', name: 'Network Info', icon: 'wifi', test: testNetwork },
+        { id: 'clientHints', name: 'Client Hints', icon: 'info', test: testClientHints },
+        { id: 'storage', name: 'Storage APIs', icon: 'database', test: testStorage },
+        { id: 'media', name: 'Media Devices', icon: 'camera', test: testMediaDevices }
+    ];
+    
+    const results = {};
+    
+    for (const test of tests) {
+        try {
+            const result = await test.test();
+            results[test.id] = {
+                ...result,
+                name: test.name,
+                icon: test.icon
+            };
+        } catch (error) {
+            results[test.id] = {
+                name: test.name,
+                icon: test.icon,
+                status: 'unknown',
+                summary: 'Test failed',
+                details: { error: error.message }
+            };
+        }
+    }
+    
+    return results;
+};

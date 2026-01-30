@@ -1,34 +1,85 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* App-specific styles - uses design system tokens */
+
+/* Selection styling */
+::selection {
+    background: hsl(var(--primary) / 0.2);
+    color: hsl(var(--foreground));
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
+/* Focus visible for accessibility */
+:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+/* Smooth hover transitions for interactive elements */
+button,
+a,
+[role="button"] {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+/* Card hover enhancement */
+.leak-card {
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.leak-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Badge refinements */
+.status-safe {
+    background: hsl(var(--success) / 0.1);
+    color: hsl(var(--success));
+    border-color: hsl(var(--success) / 0.3);
+}
+
+.status-leak {
+    background: hsl(var(--destructive) / 0.1);
+    color: hsl(var(--destructive));
+    border-color: hsl(var(--destructive) / 0.3);
+}
+
+.status-warning {
+    background: hsl(var(--warning) / 0.1);
+    color: hsl(var(--warning));
+    border-color: hsl(var(--warning) / 0.3);
+}
+
+.status-unknown {
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    border-color: hsl(var(--border));
+}
+
+/* Loading skeleton animation */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
     }
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
-}
-
-.App-link {
-    color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
+/* Responsive improvements */
+@media (max-width: 640px) {
+    .leak-card {
+        padding: 0.75rem;
     }
-    to {
-        transform: rotate(360deg);
+}
+
+/* Print styles */
+@media print {
+    header,
+    footer,
+    button {
+        display: none !important;
+    }
+    
+    .leak-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
 }

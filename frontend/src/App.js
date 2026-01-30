@@ -1,54 +1,101 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React, { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Header from '@/components/Header';
+import Hero from '@/components/Hero';
+import ResultsGrid from '@/components/ResultsGrid';
+import Footer from '@/components/Footer';
+import { runAllTests } from '@/utils/privacyTests';
+import { Toaster } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
+const HomePage = () => {
+    const [results, setResults] = useState(null);
+    const [isScanning, setIsScanning] = useState(true);
+    const [stats, setStats] = useState(null);
+    
+    const calculateStats = useCallback((results) => {
+        if (!results) return null;
+        
+        const values = Object.values(results);
+        return {
+            total: values.length,
+            leak: values.filter(r => r.status === 'leak').length,
+            safe: values.filter(r => r.status === 'safe').length,
+            warning: values.filter(r => r.status === 'warning').length,
+            unknown: values.filter(r => r.status === 'unknown').length
+        };
+    }, []);
+    
+    const runScan = useCallback(async () => {
+        setIsScanning(true);
+        setResults(null);
+        setStats(null);
+        
+        toast.info('Starting privacy scan...', {
+            description: 'Analyzing your browser fingerprint'
+        });
+        
+        try {
+            const testResults = await runAllTests();
+            setResults(testResults);
+            
+            const newStats = calculateStats(testResults);
+            setStats(newStats);
+            
+            if (newStats.leak > newStats.safe) {
+                toast.error(`${newStats.leak} privacy leaks detected`, {
+                    description: 'Your browser is exposing significant data'
+                });
+            } else if (newStats.leak > 0) {
+                toast.warning(`${newStats.leak} potential exposures found`, {
+                    description: 'Some privacy improvements recommended'
+                });
+            } else {
+                toast.success('Great privacy posture!', {
+                    description: 'Your browser is well protected'
+                });
+            }
+        } catch (error) {
+            console.error('Scan failed:', error);
+            toast.error('Scan failed', {
+                description: 'Please try refreshing the page'
+            });
+        } finally {
+            setIsScanning(false);
+        }
+    }, [calculateStats]);
+    
+    useEffect(() => {
+        // Run scan on mount
+        runScan();
+    }, [runScan]);
+    
+    return (
+        <div className="min-h-screen bg-background">
+            <Header onRefresh={runScan} isScanning={isScanning} />
+            <main>
+                <Hero stats={stats} isScanning={isScanning} />
+                <ResultsGrid results={results} isLoading={isScanning} />
+            </main>
+            <Footer />
+            <Toaster 
+                position="bottom-right"
+                toastOptions={{
+                    className: 'bg-card border-border text-foreground',
+                }}
+            />
+        </div>
+    );
 };
 
 function App() {
-  return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
-  );
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route path="/" element={<HomePage />} />
+            </Routes>
+        </BrowserRouter>
+    );
 }
 
 export default App;
