@@ -366,7 +366,7 @@ export const getTestExplanation = (testId) => {
         },
         timezone: {
             what: "Your system timezone is visible to websites.",
-            risk: "Timezone reveals your general geographic region.",
+            risk: "Timezone reveals your general geographic region and adds ~6 bits of identifying information.",
             protect: "Tor Browser normalizes timezone to UTC."
         },
         dnt: {
@@ -398,6 +398,21 @@ export const getTestExplanation = (testId) => {
             what: "Websites can enumerate your cameras and microphones.",
             risk: "Device count and types contribute to fingerprinting.",
             protect: "Deny media access when not needed."
+        },
+        touch: {
+            what: "Touch support indicates whether your device has a touchscreen.",
+            risk: "This helps trackers determine your device type (mobile, tablet, desktop).",
+            protect: "Limited protection available - this is tied to your hardware."
+        },
+        adBlocker: {
+            what: "Websites can detect if you're using an ad blocker.",
+            risk: "While ad blockers improve privacy, their detection adds to your fingerprint.",
+            protect: "Keep using an ad blocker - the privacy benefits outweigh fingerprinting concerns."
+        },
+        httpHeaders: {
+            what: "HTTP headers are sent with every request, revealing browser preferences.",
+            risk: "Language, encoding preferences, and other headers help identify you.",
+            protect: "Browser language is hard to spoof without breaking usability."
         }
     };
     
