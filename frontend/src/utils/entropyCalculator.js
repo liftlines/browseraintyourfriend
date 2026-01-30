@@ -21,16 +21,16 @@ export const calculateEntropy = (results) => {
             leakImpact: 'high'
         },
         
-        // Canvas - ~10 bits when unique, ~1-2 bits when randomized
+        // Canvas - ~10 bits when unique, ~1.27 bits when randomized (EFF value)
         canvas: {
-            baseBits: (details) => details?.randomized ? 1.3 : 10,
+            baseBits: (details) => details?.randomized ? 1.27 : 10,
             description: 'Canvas rendering varies by hardware/software',
             leakImpact: 'high'
         },
         
-        // WebGL - ~7 bits for renderer info, ~1.4 bits when randomized
+        // WebGL - ~7.2 bits for renderer info, ~1.44 bits when randomized (EFF value)
         webgl: {
-            baseBits: (details) => details?.randomized ? 1.4 : 7.2,
+            baseBits: (details) => (details?.randomized || details?.spoofed) ? 1.44 : 7.2,
             description: 'GPU and driver information is identifying',
             leakImpact: 'medium'
         },
