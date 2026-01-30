@@ -163,14 +163,19 @@ const UniquenessCard = ({ entropy }) => {
                 <div className="text-xs text-muted-foreground border-t border-border pt-4">
                     <p>
                         <strong>What does this mean?</strong> The more &quot;bits&quot; of identifying information your browser reveals, 
-                        the easier it is for websites to pick you out of the crowd. With {totalBits.toFixed(0)} bits, 
-                        {totalBits >= 20 
+                        the easier it is for websites to pick you out of the crowd. With {displayBits.toFixed(1)} bits, 
+                        {displayBits >= 20 
                             ? ' you stand out like a needle in a haystack - websites can easily track you.' 
-                            : totalBits >= 10 
+                            : displayBits >= 10 
                                 ? ' you blend in somewhat, but could still be identified.' 
                                 : ' you blend in well with many other users.'
                         }
                     </p>
+                    {totalBits !== displayBits && (
+                        <p className="mt-2 text-muted-foreground/70">
+                            <em>Note: Your IP address adds ~18 additional bits of identifying info (not included above as it&apos;s server-side data).</em>
+                        </p>
+                    )}
                 </div>
             </CardContent>
         </Card>
