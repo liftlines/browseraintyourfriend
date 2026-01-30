@@ -117,41 +117,51 @@ export const testWebRTC = () => {
     });
 };
 
-// 3. Canvas Fingerprinting
+// 3. Canvas Fingerprinting - with randomization detection
 export const testCanvas = async () => {
     try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 200;
-        canvas.height = 50;
-        const ctx = canvas.getContext('2d');
+        const generateCanvasHash = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 200;
+            canvas.height = 50;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw various elements to create unique fingerprint
+            ctx.textBaseline = 'top';
+            ctx.font = "14px 'Arial'";
+            ctx.fillStyle = '#f60';
+            ctx.fillRect(0, 0, 62, 20);
+            ctx.fillStyle = '#069';
+            ctx.fillText('Browseraintyourfriend', 2, 15);
+            ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+            ctx.fillText('Canvas Test', 4, 17);
+            
+            // Add some shapes
+            ctx.beginPath();
+            ctx.arc(100, 25, 15, 0, Math.PI * 2);
+            ctx.fillStyle = '#e74c3c';
+            ctx.fill();
+            
+            const dataUrl = canvas.toDataURL();
+            return await hashString(dataUrl);
+        };
         
-        // Draw various elements to create unique fingerprint
-        ctx.textBaseline = 'top';
-        ctx.font = "14px 'Arial'";
-        ctx.fillStyle = '#f60';
-        ctx.fillRect(0, 0, 62, 20);
-        ctx.fillStyle = '#069';
-        ctx.fillText('Browseraintyourfriend', 2, 15);
-        ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
-        ctx.fillText('Canvas Test', 4, 17);
+        // Generate hash twice to detect randomization
+        const hash1 = await generateCanvasHash();
+        const hash2 = await generateCanvasHash();
         
-        // Add some shapes
-        ctx.beginPath();
-        ctx.arc(100, 25, 15, 0, Math.PI * 2);
-        ctx.fillStyle = '#e74c3c';
-        ctx.fill();
-        
-        const dataUrl = canvas.toDataURL();
-        const hash = await hashString(dataUrl);
+        const isRandomized = hash1 !== hash2;
         
         return {
-            status: 'leak',
-            summary: 'Canvas fingerprint is unique',
+            status: isRandomized ? 'safe' : 'leak',
+            summary: isRandomized ? 'Canvas fingerprint is randomized (protected)' : 'Canvas fingerprint is unique',
             details: {
-                hash: hash.substring(0, 32) + '...',
-                fullHash: hash,
+                hash: hash1.substring(0, 32) + '...',
+                fullHash: hash1,
                 supported: true,
-                uniqueIdentifier: true
+                randomized: isRandomized,
+                uniqueIdentifier: !isRandomized,
+                protection: isRandomized ? 'Browser is randomizing canvas fingerprint' : 'No canvas protection detected'
             }
         };
     } catch (error) {
