@@ -5,8 +5,16 @@ import { Button } from '@/components/ui/button';
 import { 
     Globe, Video, Palette, Cpu, Code, Monitor, Type, Music,
     MapPin, Clock, EyeOff, Battery, Wifi, Info, Database, Camera,
-    ChevronDown, ChevronUp, Shield, ShieldAlert, ShieldQuestion, AlertTriangle
+    ChevronDown, ChevronUp, Shield, ShieldAlert, ShieldQuestion, AlertTriangle,
+    HelpCircle
 } from 'lucide-react';
+import { getTestExplanation } from '@/utils/entropyCalculator';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 const iconMap = {
     globe: Globe,
