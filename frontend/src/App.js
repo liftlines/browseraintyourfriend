@@ -3,8 +3,11 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
 import ResultsGrid from '@/components/ResultsGrid';
+import UniquenessCard from '@/components/UniquenessCard';
+import RecommendationsCard from '@/components/RecommendationsCard';
 import Footer from '@/components/Footer';
 import { runAllTests } from '@/utils/privacyTests';
+import { calculateEntropy, getRecommendations } from '@/utils/entropyCalculator';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 
