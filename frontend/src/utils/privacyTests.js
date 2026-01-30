@@ -636,6 +636,86 @@ export const testMediaDevices = async () => {
     }
 };
 
+// 17. Touch Support
+export const testTouchSupport = () => {
+    const maxTouchPoints = navigator.maxTouchPoints || 0;
+    const touchEvent = 'ontouchstart' in window;
+    const touchEventSupported = window.TouchEvent !== undefined;
+    
+    const hasTouch = maxTouchPoints > 0 || touchEvent;
+    
+    return {
+        status: 'leak',
+        summary: hasTouch ? `Touch enabled (${maxTouchPoints} points)` : 'No touch support',
+        details: {
+            maxTouchPoints,
+            touchEventSupported: touchEventSupported,
+            onTouchStartSupported: touchEvent,
+            hasTouch,
+            note: 'Touch support helps identify device type'
+        }
+    };
+};
+
+// 18. Ad Blocker Detection
+export const testAdBlocker = async () => {
+    try {
+        // Try to create a bait element that ad blockers typically block
+        const bait = document.createElement('div');
+        bait.className = 'adsbox ad-banner ad-placement pub_300x250 textAd';
+        bait.style.cssText = 'position: absolute; top: -10px; left: -10px; width: 1px; height: 1px;';
+        bait.innerHTML = '&nbsp;';
+        document.body.appendChild(bait);
+        
+        // Wait a moment for ad blocker to act
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const blocked = bait.offsetHeight === 0 || 
+                       bait.offsetWidth === 0 || 
+                       bait.clientHeight === 0 ||
+                       getComputedStyle(bait).display === 'none' ||
+                       getComputedStyle(bait).visibility === 'hidden';
+        
+        document.body.removeChild(bait);
+        
+        return {
+            status: blocked ? 'safe' : 'leak',
+            summary: blocked ? 'Ad blocker detected' : 'No ad blocker detected',
+            details: {
+                adBlockerDetected: blocked,
+                note: blocked 
+                    ? 'Using an ad blocker helps protect privacy but can make you more unique'
+                    : 'Consider using an ad blocker like uBlock Origin'
+            }
+        };
+    } catch (error) {
+        return {
+            status: 'unknown',
+            summary: 'Could not test',
+            details: { error: error.message }
+        };
+    }
+};
+
+// 19. HTTP Headers Info (what can be inferred)
+export const testHttpHeaders = () => {
+    // We can't directly access HTTP headers from JS, but we can infer some
+    const acceptLanguage = navigator.languages ? navigator.languages.join(', ') : navigator.language;
+    const encoding = 'gzip, deflate, br'; // Standard modern browsers
+    
+    return {
+        status: 'leak',
+        summary: `Language: ${navigator.language}`,
+        details: {
+            acceptLanguage,
+            inferredAccept: 'text/html, application/xhtml+xml, */*',
+            inferredEncoding: encoding,
+            connection: 'keep-alive',
+            note: 'HTTP headers are sent with every request and reveal browser preferences'
+        }
+    };
+};
+
 // Run all tests in parallel with timeout protection
 export const runAllTests = async () => {
     const tests = [
@@ -654,7 +734,10 @@ export const runAllTests = async () => {
         { id: 'network', name: 'Network Info', icon: 'wifi', test: testNetwork },
         { id: 'clientHints', name: 'Client Hints', icon: 'info', test: testClientHints },
         { id: 'storage', name: 'Storage APIs', icon: 'database', test: testStorage },
-        { id: 'media', name: 'Media Devices', icon: 'camera', test: testMediaDevices }
+        { id: 'media', name: 'Media Devices', icon: 'camera', test: testMediaDevices },
+        { id: 'touch', name: 'Touch Support', icon: 'hand', test: testTouchSupport },
+        { id: 'adBlocker', name: 'Ad Blocker', icon: 'shield', test: testAdBlocker },
+        { id: 'httpHeaders', name: 'HTTP Headers', icon: 'fileText', test: testHttpHeaders }
     ];
     
     // Helper to run test with timeout
