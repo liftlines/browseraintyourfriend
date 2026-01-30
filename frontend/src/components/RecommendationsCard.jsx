@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Shield, ExternalLink, ChevronRight } from 'lucide-react';
+import { Shield, ExternalLink, ChevronRight, Rocket } from 'lucide-react';
 
 const RecommendationsCard = ({ recommendations }) => {
     if (!recommendations || recommendations.length === 0) return null;
@@ -112,6 +112,34 @@ const RecommendationsCard = ({ recommendations }) => {
                             Consider using a VPN for IP address privacy
                         </li>
                     </ul>
+                </div>
+                
+                {/* Logos CTA */}
+                <div className="mt-6 pt-4 border-t border-border">
+                    <div className="p-5 rounded-xl bg-gradient-to-br from-primary/5 via-accent/10 to-primary/5 border border-primary/20">
+                        <div className="flex items-start gap-4">
+                            <div className="p-2 rounded-lg bg-primary/10">
+                                <Rocket className="h-6 w-6 text-primary" />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="font-serif text-lg text-foreground mb-2">
+                                    Want to escape browser hell altogether?
+                                </h4>
+                                <p className="text-sm text-muted-foreground mb-4">
+                                    The browser was never designed with your privacy in mind. 
+                                    Escape the surveillance web entirely with a new paradigm.
+                                </p>
+                                <Button
+                                    variant="outline"
+                                    className="border-primary/30 hover:bg-primary/10 text-foreground"
+                                    onClick={() => window.open('https://logos.co', '_blank')}
+                                >
+                                    Escape with Logos
+                                    <ExternalLink className="h-4 w-4 ml-2" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </CardContent>
         </Card>
