@@ -89,8 +89,27 @@ const HomePage = () => {
         <div className="min-h-screen bg-background">
             <Header onRefresh={runScan} isScanning={isScanning} />
             <main>
-                <Hero stats={stats} isScanning={isScanning} />
+                <Hero stats={stats} isScanning={isScanning} entropy={entropy} />
+                
+                {/* Uniqueness Card - Shows after scanning */}
+                {!isScanning && entropy && (
+                    <section className="px-4 sm:px-6 lg:px-8 pb-8">
+                        <div className="max-w-6xl mx-auto">
+                            <UniquenessCard entropy={entropy} />
+                        </div>
+                    </section>
+                )}
+                
                 <ResultsGrid results={results} isLoading={isScanning} />
+                
+                {/* Recommendations - Shows after scanning */}
+                {!isScanning && recommendations.length > 0 && (
+                    <section className="px-4 sm:px-6 lg:px-8 pb-8">
+                        <div className="max-w-6xl mx-auto">
+                            <RecommendationsCard recommendations={recommendations} />
+                        </div>
+                    </section>
+                )}
             </main>
             <Footer />
             <Toaster 
