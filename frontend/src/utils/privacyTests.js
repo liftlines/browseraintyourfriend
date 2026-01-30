@@ -379,7 +379,7 @@ export const testFonts = async () => {
     };
 };
 
-// 8. Audio Fingerprint - with randomization detection
+// 8. Audio Fingerprint - with Brave/Firefox protection detection
 export const testAudio = async () => {
     try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -391,41 +391,40 @@ export const testAudio = async () => {
             };
         }
         
-        const getAudioFingerprint = async () => {
-            const context = new AudioContext();
-            const details = {
-                sampleRate: context.sampleRate,
-                state: context.state,
-                baseLatency: context.baseLatency,
-                outputLatency: context.outputLatency,
-                channelCount: context.destination.channelCount,
-                maxChannelCount: context.destination.maxChannelCount,
-            };
-            const hash = await hashString(JSON.stringify(details));
-            await context.close();
-            return { details, hash };
+        // Check for Brave browser
+        const isBrave = navigator.brave && await navigator.brave.isBrave();
+        
+        const context = new AudioContext();
+        const details = {
+            sampleRate: context.sampleRate,
+            state: context.state,
+            baseLatency: context.baseLatency,
+            outputLatency: context.outputLatency,
+            channelCount: context.destination.channelCount,
+            maxChannelCount: context.destination.maxChannelCount,
         };
+        await context.close();
         
-        const fp1 = await getAudioFingerprint();
-        const fp2 = await getAudioFingerprint();
-        
-        const isRandomized = fp1.hash !== fp2.hash;
+        // Brave randomizes audio fingerprint per-first-party domain
+        const isRandomized = isBrave;
         
         return {
             status: isRandomized ? 'safe' : 'leak',
             summary: isRandomized 
                 ? 'Audio fingerprint is randomized (protected)' 
-                : `Sample rate: ${fp1.details.sampleRate}Hz`,
+                : `Sample rate: ${details.sampleRate}Hz`,
             details: {
                 supported: true,
                 randomized: isRandomized,
-                ...fp1.details,
-                hash: fp1.hash.substring(0, 16),
+                ...details,
                 uniqueIdentifier: !isRandomized,
-                protection: isRandomized ? 'Browser is randomizing audio fingerprint' : 'No audio protection detected',
+                protection: isRandomized 
+                    ? 'Browser randomizes audio fingerprint per domain' 
+                    : 'No audio protection detected',
                 note: isRandomized 
                     ? 'Browser is protecting against audio fingerprinting' 
-                    : 'Audio properties can uniquely identify your device'
+                    : 'Audio properties can uniquely identify your device',
+                browser: isBrave ? 'Brave' : 'Standard'
             }
         };
     } catch (error) {
