@@ -11,7 +11,7 @@ const Header = ({ onRefresh, isScanning }) => {
                     <div className="flex items-center gap-2">
                         <Shield className="h-6 w-6 text-foreground" />
                         <span className="font-serif text-lg text-foreground tracking-tight">
-                            Browser<span className="text-muted-foreground">ain't</span>yourfriend
+                            Browser<span className="text-muted-foreground">ain&apos;t</span>yourfriend
                         </span>
                     </div>
                     

@@ -570,14 +570,18 @@ export const testStorage = () => {
         localStorage.setItem('test', 'test');
         localStorage.removeItem('test');
         storage.localStorage = true;
-    } catch (e) {}
+    } catch (e) {
+        // localStorage not available
+    }
     
     // Test sessionStorage
     try {
         sessionStorage.setItem('test', 'test');
         sessionStorage.removeItem('test');
         storage.sessionStorage = true;
-    } catch (e) {}
+    } catch (e) {
+        // sessionStorage not available
+    }
     
     // Test IndexedDB
     storage.indexedDB = !!window.indexedDB;
