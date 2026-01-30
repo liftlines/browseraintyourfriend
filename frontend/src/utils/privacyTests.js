@@ -321,16 +321,56 @@ export const testScreen = () => {
     };
 };
 
-// 7. Font Detection
+// 7. Font Detection - Extended list matching EFF Cover Your Tracks
 export const testFonts = async () => {
     const baseFonts = ['monospace', 'sans-serif', 'serif'];
+    
+    // Extended font list - includes all fonts EFF tests for
     const testFonts = [
-        'Arial', 'Arial Black', 'Comic Sans MS', 'Courier New', 'Georgia',
-        'Impact', 'Lucida Console', 'Lucida Sans Unicode', 'Palatino Linotype',
-        'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana',
-        'Monaco', 'Menlo', 'Consolas', 'DejaVu Sans', 'Liberation Sans',
-        'Helvetica', 'Helvetica Neue', 'SF Pro', 'Segoe UI', 'Roboto',
-        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Open Sans'
+        // Common Windows fonts
+        'Arial', 'Arial Black', 'Arial Narrow', 'Arial Rounded MT Bold',
+        'Book Antiqua', 'Bookman Old Style',
+        'Calibri', 'Cambria', 'Cambria Math', 'Century', 'Century Gothic', 'Century Schoolbook',
+        'Comic Sans MS', 'Consolas', 'Courier', 'Courier New',
+        'Georgia',
+        'Helvetica',
+        'Impact',
+        'Lucida Bright', 'Lucida Calligraphy', 'Lucida Console', 'Lucida Fax',
+        'Lucida Handwriting', 'Lucida Sans', 'Lucida Sans Typewriter', 'Lucida Sans Unicode',
+        'Microsoft Sans Serif', 'Monotype Corsiva', 'MS Gothic', 'MS Outlook', 'MS PGothic',
+        'MS Reference Sans Serif', 'MS Sans Serif', 'MS Serif',
+        'Palatino Linotype',
+        'Segoe Print', 'Segoe Script', 'Segoe UI', 'Segoe UI Light', 'Segoe UI Semibold', 'Segoe UI Symbol',
+        'Tahoma', 'Times', 'Times New Roman', 'Trebuchet MS',
+        'Verdana',
+        'Wingdings', 'Wingdings 2', 'Wingdings 3',
+        // Mac fonts
+        'American Typewriter', 'Andale Mono', 'Apple Chancery', 'Apple Color Emoji',
+        'Apple SD Gothic Neo', 'Arial Hebrew', 'Avenir', 'Avenir Next',
+        'Baskerville', 'Big Caslon', 'Brush Script MT',
+        'Chalkboard', 'Chalkboard SE', 'Chalkduster', 'Charter', 'Cochin', 'Copperplate',
+        'Didot',
+        'Futura',
+        'Geneva', 'Gill Sans',
+        'Helvetica Neue', 'Herculanum', 'Hoefler Text',
+        'Lucida Grande',
+        'Marker Felt', 'Menlo', 'Monaco',
+        'Noteworthy',
+        'Optima', 'Osaka',
+        'Papyrus', 'Phosphate', 'PT Mono', 'PT Sans', 'PT Serif',
+        'Rockwell',
+        'San Francisco', 'Savoye LET', 'SignPainter', 'Skia', 'Snell Roundhand',
+        'SF Pro', 'SF Pro Display', 'SF Pro Text',
+        // Linux fonts
+        'DejaVu Sans', 'DejaVu Sans Mono', 'DejaVu Serif',
+        'Droid Sans', 'Droid Sans Mono', 'Droid Serif',
+        'Fira Code', 'Fira Mono', 'Fira Sans',
+        'Liberation Mono', 'Liberation Sans', 'Liberation Serif',
+        'Noto Sans', 'Noto Serif',
+        'Open Sans',
+        'Roboto', 'Roboto Condensed', 'Roboto Mono', 'Roboto Slab',
+        'Source Code Pro', 'Source Sans Pro', 'Source Serif Pro',
+        'Ubuntu', 'Ubuntu Mono'
     ];
     
     const testString = 'mmmmmmmmmmlli';
@@ -366,6 +406,9 @@ export const testFonts = async () => {
     });
     
     const hash = await hashString(detectedFonts.join(','));
+    
+    // Calculate bits based on EFF methodology (~0.29 bits per font detected)
+    const bits = detectedFonts.length * 0.29;
     
     return {
         status: 'leak',
