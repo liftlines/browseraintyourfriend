@@ -365,7 +365,7 @@ export const testFonts = async () => {
     };
 };
 
-// 8. Audio Fingerprint - Simplified to avoid autoplay restrictions
+// 8. Audio Fingerprint - with randomization detection
 export const testAudio = async () => {
     try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -377,36 +377,41 @@ export const testAudio = async () => {
             };
         }
         
-        // Create context but don't start it - just check capabilities
-        const context = new AudioContext();
-        
-        // Get audio context properties that can be used for fingerprinting
-        const details = {
-            supported: true,
-            sampleRate: context.sampleRate,
-            state: context.state,
-            baseLatency: context.baseLatency,
-            outputLatency: context.outputLatency,
-            channelCount: context.destination.channelCount,
-            maxChannelCount: context.destination.maxChannelCount,
-            numberOfInputs: context.destination.numberOfInputs,
-            numberOfOutputs: context.destination.numberOfOutputs
+        const getAudioFingerprint = async () => {
+            const context = new AudioContext();
+            const details = {
+                sampleRate: context.sampleRate,
+                state: context.state,
+                baseLatency: context.baseLatency,
+                outputLatency: context.outputLatency,
+                channelCount: context.destination.channelCount,
+                maxChannelCount: context.destination.maxChannelCount,
+            };
+            const hash = await hashString(JSON.stringify(details));
+            await context.close();
+            return { details, hash };
         };
         
-        // Generate hash from these properties
-        const hash = await hashString(JSON.stringify(details));
+        const fp1 = await getAudioFingerprint();
+        const fp2 = await getAudioFingerprint();
         
-        // Close context
-        await context.close();
+        const isRandomized = fp1.hash !== fp2.hash;
         
         return {
-            status: 'leak',
-            summary: `Sample rate: ${details.sampleRate}Hz`,
+            status: isRandomized ? 'safe' : 'leak',
+            summary: isRandomized 
+                ? 'Audio fingerprint is randomized (protected)' 
+                : `Sample rate: ${fp1.details.sampleRate}Hz`,
             details: {
-                ...details,
-                hash: hash.substring(0, 16),
-                uniqueIdentifier: true,
-                note: 'Audio properties can uniquely identify your device'
+                supported: true,
+                randomized: isRandomized,
+                ...fp1.details,
+                hash: fp1.hash.substring(0, 16),
+                uniqueIdentifier: !isRandomized,
+                protection: isRandomized ? 'Browser is randomizing audio fingerprint' : 'No audio protection detected',
+                note: isRandomized 
+                    ? 'Browser is protecting against audio fingerprinting' 
+                    : 'Audio properties can uniquely identify your device'
             }
         };
     } catch (error) {
