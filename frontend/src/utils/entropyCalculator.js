@@ -1,148 +1,154 @@
 // Entropy and Uniqueness Calculations
 // Inspired by EFF Cover Your Tracks
-
-// Approximate entropy bits based on how unique each value is
-// Higher bits = more identifying = more unique
+// Uses more accurate bit values based on EFF's methodology
 
 export const calculateEntropy = (results) => {
     const entropyMap = {
-        // IP Address - Very unique (typically 32 bits for IPv4)
+        // IP Address - ~18 bits based on global IP space usage
         ip: {
-            baseBits: 18,
+            baseBits: (details) => details?.exposed ? 18 : 0,
             description: 'Your IP address is highly identifying',
             leakImpact: 'high'
         },
         
         // WebRTC - Can leak local IPs even through VPN
         webrtc: {
-            baseBits: (details) => details?.localIPs?.length > 0 ? 12 : 0,
+            baseBits: (details) => {
+                if (details?.leaking === false) return 0;
+                return details?.localIPs?.length > 0 ? 8 : 0;
+            },
             description: 'WebRTC can reveal local network information',
             leakImpact: 'high'
         },
         
-        // Canvas - Very unique fingerprint
+        // Canvas - ~10 bits when unique, ~1-2 bits when randomized
         canvas: {
-            baseBits: 10,
+            baseBits: (details) => details?.randomized ? 1.3 : 10,
             description: 'Canvas rendering varies by hardware/software',
             leakImpact: 'high'
         },
         
-        // WebGL - GPU-specific
+        // WebGL - ~7 bits for renderer info, ~1.4 bits when randomized
         webgl: {
-            baseBits: 8,
+            baseBits: (details) => details?.randomized ? 1.4 : 7.2,
             description: 'GPU and driver information is identifying',
             leakImpact: 'medium'
         },
         
-        // Browser Info - Moderately unique
+        // Browser Info - User agent ~3.5 bits, platform ~1.5 bits
         javascript: {
-            baseBits: 6,
+            baseBits: (details) => {
+                let bits = 3.5; // User agent
+                bits += 1.5; // Platform
+                if (details?.hardwareConcurrencyRandomized) {
+                    bits += 2.2; // Randomized HW concurrency still adds some
+                } else {
+                    bits += 2.1; // Normal HW concurrency
+                }
+                return bits;
+            },
             description: 'Browser and OS details narrow down users',
             leakImpact: 'medium'
         },
         
-        // Screen - Less unique but contributes
+        // Screen - ~6 bits based on EFF data
         screen: {
-            baseBits: 4,
+            baseBits: 6.2,
             description: 'Screen resolution helps identify device type',
-            leakImpact: 'low'
+            leakImpact: 'medium'
         },
         
-        // Fonts - Can be very unique
+        // Fonts - Variable based on count, EFF shows ~9 bits for 32 fonts
         fonts: {
             baseBits: (details) => {
                 const count = details?.count || 0;
-                if (count > 20) return 10;
-                if (count > 10) return 6;
-                return 3;
+                // Roughly 0.3 bits per unique font detected
+                return Math.min(count * 0.3, 10);
             },
             description: 'Installed fonts vary significantly between systems',
             leakImpact: 'high'
         },
         
-        // Audio - Unique fingerprint
+        // Audio - ~2 bits when unique, ~1.6 bits when randomized
         audio: {
-            baseBits: 6,
+            baseBits: (details) => details?.randomized ? 1.6 : 2.15,
             description: 'Audio processing varies by hardware',
-            leakImpact: 'medium'
+            leakImpact: 'low'
         },
         
-        // Geolocation - If granted, very identifying
+        // Geolocation - Only counts if permission granted
         geolocation: {
             baseBits: (details) => details?.permissionState === 'granted' ? 15 : 0,
             description: 'Precise location is highly identifying',
             leakImpact: 'high'
         },
         
-        // Timezone - Somewhat identifying (based on EFF ~6 bits)
+        // Timezone - ~6.5 bits based on EFF data
         timezone: {
-            baseBits: 6,
+            baseBits: 6.5,
             description: 'Timezone narrows location to a region',
             leakImpact: 'medium'
         },
         
-        // DNT - Actually adds uniqueness since most don't enable it
+        // DNT - ~1.7 bits when enabled (makes you more unique)
         dnt: {
-            baseBits: (details) => details?.dntEnabled ? 2 : 0,
+            baseBits: (details) => details?.dntEnabled ? 1.7 : 0,
             description: 'DNT header ironically makes you more unique',
             leakImpact: 'low'
         },
         
-        // Battery - Can be identifying
+        // Battery - ~0.5 bits when available
         battery: {
-            baseBits: (details) => details?.supported ? 3 : 0,
+            baseBits: (details) => details?.supported && !details?.blocked ? 0.5 : 0,
             description: 'Battery level can correlate browsing sessions',
             leakImpact: 'low'
         },
         
-        // Network - Moderately identifying
+        // Network - ~0.3 bits when available
         network: {
-            baseBits: (details) => details?.supported ? 3 : 0,
+            baseBits: (details) => details?.supported ? 0.3 : 0,
             description: 'Connection type helps identify device',
             leakImpact: 'low'
         },
         
-        // Client Hints - Modern fingerprinting
+        // Client Hints - ~2 bits when available
         clientHints: {
-            baseBits: (details) => details?.supported ? 5 : 0,
+            baseBits: (details) => details?.supported ? 2 : 0,
             description: 'Client hints provide detailed browser info',
             leakImpact: 'medium'
         },
         
-        // Storage - Enables tracking
+        // Storage - ~0.3 bits (supercookie test)
         storage: {
-            baseBits: 2,
+            baseBits: 0.26,
             description: 'Storage APIs enable persistent tracking',
-            leakImpact: 'medium'
+            leakImpact: 'low'
         },
         
-        // Media Devices - Can be unique
+        // Media Devices - ~1 bit
         media: {
-            baseBits: (details) => {
-                const total = (details?.audioinput || 0) + (details?.videoinput || 0);
-                return total > 2 ? 4 : 2;
-            },
+            baseBits: (details) => details?.supported && !details?.blocked ? 1 : 0,
             description: 'Device configuration is identifying',
             leakImpact: 'low'
         },
         
-        // Touch Support - Device type indicator
+        // Touch Support - ~0.9 bits
         touch: {
-            baseBits: 1,
+            baseBits: 0.92,
             description: 'Touch support reveals device type',
             leakImpact: 'low'
         },
         
-        // Ad Blocker - Makes you more unique if detected
+        // Ad Blocker - ~0 bits (very common)
         adBlocker: {
-            baseBits: (details) => details?.adBlockerDetected ? 2 : 0,
-            description: 'Ad blocker usage is somewhat rare',
+            baseBits: 0,
+            description: 'Ad blocker usage is common',
             leakImpact: 'low'
         },
         
-        // HTTP Headers - Language and accept headers
+        // HTTP Headers - ~2.7 bits for accept headers
         httpHeaders: {
-            baseBits: 3,
+            baseBits: 2.74,
             description: 'HTTP headers reveal browser preferences',
             leakImpact: 'low'
         }
