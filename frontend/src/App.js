@@ -15,6 +15,8 @@ const HomePage = () => {
     const [results, setResults] = useState(null);
     const [isScanning, setIsScanning] = useState(true);
     const [stats, setStats] = useState(null);
+    const [entropy, setEntropy] = useState(null);
+    const [recommendations, setRecommendations] = useState([]);
     
     const calculateStats = useCallback((results) => {
         if (!results) return null;
@@ -33,6 +35,8 @@ const HomePage = () => {
         setIsScanning(true);
         setResults(null);
         setStats(null);
+        setEntropy(null);
+        setRecommendations([]);
         
         toast.info('Starting privacy scan...', {
             description: 'Analyzing your browser fingerprint'
@@ -45,9 +49,17 @@ const HomePage = () => {
             const newStats = calculateStats(testResults);
             setStats(newStats);
             
+            // Calculate entropy/uniqueness
+            const entropyData = calculateEntropy(testResults);
+            setEntropy(entropyData);
+            
+            // Get recommendations
+            const recs = getRecommendations(testResults, entropyData);
+            setRecommendations(recs);
+            
             if (newStats.leak > newStats.safe) {
                 toast.error(`${newStats.leak} privacy leaks detected`, {
-                    description: 'Your browser is exposing significant data'
+                    description: `Your browser fingerprint has ${entropyData.totalBits.toFixed(0)} bits of entropy`
                 });
             } else if (newStats.leak > 0) {
                 toast.warning(`${newStats.leak} potential exposures found`, {
