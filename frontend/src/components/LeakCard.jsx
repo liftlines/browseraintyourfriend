@@ -68,6 +68,7 @@ const LeakCard = ({ data, index }) => {
     const Icon = iconMap[data.icon] || Info;
     const status = statusConfig[data.status] || statusConfig.unknown;
     const StatusIcon = status.icon;
+    const explanation = getTestExplanation(data.id);
     
     const renderDetailValue = (key, value) => {
         if (value === null || value === undefined) return 'N/A';
