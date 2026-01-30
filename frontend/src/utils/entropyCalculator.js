@@ -58,12 +58,13 @@ export const calculateEntropy = (results) => {
             leakImpact: 'medium'
         },
         
-        // Fonts - Variable based on count, EFF shows ~9 bits for 32 fonts
+        // Fonts - Variable based on count, EFF shows ~9.44 bits for 32 fonts
+        // This is roughly log2(692) ≈ 9.44 for 32 fonts (1 in 692.8 browsers)
         fonts: {
             baseBits: (details) => {
                 const count = details?.count || 0;
-                // Roughly 0.3 bits per unique font detected
-                return Math.min(count * 0.3, 10);
+                // EFF methodology: ~0.29 bits per font on average
+                return Math.min(count * 0.29, 10);
             },
             description: 'Installed fonts vary significantly between systems',
             leakImpact: 'high'
