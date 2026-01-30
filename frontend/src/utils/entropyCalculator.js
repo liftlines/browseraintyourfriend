@@ -74,11 +74,11 @@ export const calculateEntropy = (results) => {
             leakImpact: 'high'
         },
         
-        // Timezone - Somewhat identifying
+        // Timezone - Somewhat identifying (based on EFF ~6 bits)
         timezone: {
-            baseBits: 4,
+            baseBits: 6,
             description: 'Timezone narrows location to a region',
-            leakImpact: 'low'
+            leakImpact: 'medium'
         },
         
         // DNT - Actually adds uniqueness since most don't enable it
@@ -123,6 +123,27 @@ export const calculateEntropy = (results) => {
                 return total > 2 ? 4 : 2;
             },
             description: 'Device configuration is identifying',
+            leakImpact: 'low'
+        },
+        
+        // Touch Support - Device type indicator
+        touch: {
+            baseBits: 1,
+            description: 'Touch support reveals device type',
+            leakImpact: 'low'
+        },
+        
+        // Ad Blocker - Makes you more unique if detected
+        adBlocker: {
+            baseBits: (details) => details?.adBlockerDetected ? 2 : 0,
+            description: 'Ad blocker usage is somewhat rare',
+            leakImpact: 'low'
+        },
+        
+        // HTTP Headers - Language and accept headers
+        httpHeaders: {
+            baseBits: 3,
+            description: 'HTTP headers reveal browser preferences',
             leakImpact: 'low'
         }
     };
