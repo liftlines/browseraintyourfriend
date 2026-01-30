@@ -84,33 +84,53 @@ const Hero = ({ stats, isScanning, entropy }) => {
                 
                 {/* Stats Summary */}
                 {stats && !isScanning && (
-                    <div className="flex justify-center gap-8 sm:gap-12 mb-8 opacity-0 fade-in">
-                        <div className="text-center">
-                            <div className="text-2xl font-serif text-destructive">
-                                {stats.leak}
+                    <div className="flex flex-col items-center gap-6 mb-8 opacity-0 fade-in">
+                        <div className="flex justify-center gap-8 sm:gap-12">
+                            <div className="text-center">
+                                <div className="text-2xl font-serif text-destructive">
+                                    {stats.leak}
+                                </div>
+                                <div className="text-xs text-muted-foreground font-sans uppercase tracking-wider mt-1">
+                                    Exposed
+                                </div>
                             </div>
-                            <div className="text-xs text-muted-foreground font-sans uppercase tracking-wider mt-1">
-                                Exposed
+                            <div className="w-px bg-border h-12 self-center" />
+                            <div className="text-center">
+                                <div className="text-2xl font-serif text-success">
+                                    {stats.safe}
+                                </div>
+                                <div className="text-xs text-muted-foreground font-sans uppercase tracking-wider mt-1">
+                                    Protected
+                                </div>
+                            </div>
+                            <div className="w-px bg-border h-12 self-center" />
+                            <div className="text-center">
+                                <div className="text-2xl font-serif text-warning">
+                                    {stats.warning}
+                                </div>
+                                <div className="text-xs text-muted-foreground font-sans uppercase tracking-wider mt-1">
+                                    Warnings
+                                </div>
                             </div>
                         </div>
-                        <div className="w-px bg-border h-12 self-center" />
-                        <div className="text-center">
-                            <div className="text-2xl font-serif text-success">
-                                {stats.safe}
+                        
+                        {/* Entropy summary */}
+                        {entropy && (
+                            <div className="text-center px-4 py-2 bg-muted/30 rounded-full border border-border">
+                                <span className="text-sm text-muted-foreground font-sans">
+                                    Fingerprint uniqueness: 
+                                </span>
+                                <span className={`text-sm font-medium ml-1 ${
+                                    entropy.uniqueness.level === 'unique' || entropy.uniqueness.level === 'rare' 
+                                        ? 'text-destructive' 
+                                        : entropy.uniqueness.level === 'uncommon'
+                                            ? 'text-warning'
+                                            : 'text-success'
+                                }`}>
+                                    {entropy.totalBits.toFixed(1)} bits ({entropy.uniqueness.label})
+                                </span>
                             </div>
-                            <div className="text-xs text-muted-foreground font-sans uppercase tracking-wider mt-1">
-                                Protected
-                            </div>
-                        </div>
-                        <div className="w-px bg-border h-12 self-center" />
-                        <div className="text-center">
-                            <div className="text-2xl font-serif text-warning">
-                                {stats.warning}
-                            </div>
-                            <div className="text-xs text-muted-foreground font-sans uppercase tracking-wider mt-1">
-                                Warnings
-                            </div>
-                        </div>
+                        )}
                     </div>
                 )}
             </div>
