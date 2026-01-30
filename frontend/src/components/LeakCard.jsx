@@ -101,9 +101,21 @@ const LeakCard = ({ data, index }) => {
                             <Icon className={`h-5 w-5 ${data.status === 'leak' ? 'text-destructive' : data.status === 'safe' ? 'text-success' : 'text-muted-foreground'}`} />
                         </div>
                         <div className="min-w-0">
-                            <h3 className="font-sans font-medium text-foreground text-sm">
-                                {data.name}
-                            </h3>
+                            <div className="flex items-center gap-1">
+                                <h3 className="font-sans font-medium text-foreground text-sm">
+                                    {data.name}
+                                </h3>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-xs">
+                                            <p className="text-xs">{explanation.what}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
                             <p className="text-xs text-muted-foreground truncate mt-0.5">
                                 {data.summary}
                             </p>
