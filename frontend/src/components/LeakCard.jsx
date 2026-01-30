@@ -6,7 +6,7 @@ import {
     Globe, Video, Palette, Cpu, Code, Monitor, Type, Music,
     MapPin, Clock, EyeOff, Battery, Wifi, Info, Database, Camera,
     ChevronDown, ChevronUp, Shield, ShieldAlert, ShieldQuestion, AlertTriangle,
-    HelpCircle
+    HelpCircle, Hand, FileText
 } from 'lucide-react';
 import { getTestExplanation } from '@/utils/entropyCalculator';
 import {
