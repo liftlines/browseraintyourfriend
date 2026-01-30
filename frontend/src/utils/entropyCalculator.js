@@ -69,9 +69,9 @@ export const calculateEntropy = (results) => {
             leakImpact: 'high'
         },
         
-        // Audio - ~2 bits when unique, ~1.6 bits when randomized
+        // Audio - ~2.15 bits when unique, ~1.62 bits when randomized (EFF value)
         audio: {
-            baseBits: (details) => details?.randomized ? 1.6 : 2.15,
+            baseBits: (details) => details?.randomized ? 1.62 : 2.15,
             description: 'Audio processing varies by hardware',
             leakImpact: 'low'
         },
