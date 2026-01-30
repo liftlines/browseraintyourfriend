@@ -193,13 +193,13 @@ export const calculateEntropy = (results) => {
             fingerprintBits += bits;
         }
     });
-    });
     
     return {
-        totalBits,
+        totalBits: Math.round(totalBits * 100) / 100,
+        fingerprintBits: Math.round(fingerprintBits * 100) / 100, // EFF-comparable
         breakdown,
-        uniqueness: getUniquenessLevel(totalBits),
-        usersWithSameFingerprint: estimateMatchingUsers(totalBits)
+        uniqueness: getUniquenessLevel(fingerprintBits), // Use fingerprint bits for level
+        usersWithSameFingerprint: estimateMatchingUsers(fingerprintBits)
     };
 };
 
