@@ -13,11 +13,14 @@ import {
 const UniquenessCard = ({ entropy }) => {
     if (!entropy) return null;
     
-    const { totalBits, uniqueness, usersWithSameFingerprint, breakdown } = entropy;
+    const { totalBits, fingerprintBits, uniqueness, usersWithSameFingerprint, breakdown } = entropy;
+    
+    // Use fingerprintBits for display (comparable to EFF)
+    const displayBits = fingerprintBits || totalBits;
     
     // Calculate percentage for visual (max out at 40 bits for UI purposes)
     const maxBits = 40;
-    const percentage = Math.min((totalBits / maxBits) * 100, 100);
+    const percentage = Math.min((displayBits / maxBits) * 100, 100);
     
     // Color based on uniqueness level
     const getColorClass = (level) => {
