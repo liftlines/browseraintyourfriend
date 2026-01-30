@@ -127,7 +127,7 @@ const Hero = ({ stats, isScanning, entropy }) => {
                                             ? 'text-warning'
                                             : 'text-success'
                                 }`}>
-                                    {entropy.totalBits.toFixed(1)} bits ({entropy.uniqueness.label})
+                                    {(entropy.fingerprintBits || entropy.totalBits).toFixed(1)} bits ({entropy.uniqueness.label})
                                 </span>
                             </div>
                         )}
