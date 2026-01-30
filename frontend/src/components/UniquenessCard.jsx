@@ -112,9 +112,9 @@ const UniquenessCard = ({ entropy }) => {
                 {/* Entropy Score */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Identifying Information</span>
+                        <span className="text-sm text-muted-foreground">Browser Fingerprint</span>
                         <span className={`font-mono font-bold ${getColorClass(uniqueness.level)}`}>
-                            {totalBits.toFixed(1)} bits
+                            {displayBits.toFixed(1)} bits
                         </span>
                     </div>
                     <Progress 
