@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react';
 
-const Hero = ({ stats, isScanning }) => {
+const Hero = ({ stats, isScanning, entropy }) => {
     const getPrivacyScore = () => {
         if (!stats || stats.total === 0) return null;
         const safePercentage = (stats.safe / stats.total) * 100;
