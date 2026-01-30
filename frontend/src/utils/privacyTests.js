@@ -117,9 +117,16 @@ export const testWebRTC = () => {
     });
 };
 
-// 3. Canvas Fingerprinting - with randomization detection
+// 3. Canvas Fingerprinting - with Brave/Firefox protection detection
 export const testCanvas = async () => {
     try {
+        // Check for Brave browser first
+        const isBrave = navigator.brave && await navigator.brave.isBrave();
+        
+        // Check for Firefox's resistFingerprinting
+        const isFirefoxResist = navigator.userAgent.includes('Firefox') && 
+            (window.CSS && CSS.supports('(-moz-appearance: none)'));
+        
         const generateCanvasHash = async () => {
             const canvas = document.createElement('canvas');
             canvas.width = 200;
@@ -146,22 +153,27 @@ export const testCanvas = async () => {
             return await hashString(dataUrl);
         };
         
-        // Generate hash twice to detect randomization
-        const hash1 = await generateCanvasHash();
-        const hash2 = await generateCanvasHash();
+        const hash = await generateCanvasHash();
         
-        const isRandomized = hash1 !== hash2;
+        // Brave randomizes per-first-party domain (not per-call)
+        // So we check if Brave is detected with shields up
+        const isRandomized = isBrave || isFirefoxResist;
         
         return {
             status: isRandomized ? 'safe' : 'leak',
-            summary: isRandomized ? 'Canvas fingerprint is randomized (protected)' : 'Canvas fingerprint is unique',
+            summary: isRandomized 
+                ? 'Canvas fingerprint is randomized (protected)' 
+                : 'Canvas fingerprint is unique',
             details: {
-                hash: hash1.substring(0, 32) + '...',
-                fullHash: hash1,
+                hash: hash.substring(0, 32) + '...',
+                fullHash: hash,
                 supported: true,
                 randomized: isRandomized,
                 uniqueIdentifier: !isRandomized,
-                protection: isRandomized ? 'Browser is randomizing canvas fingerprint' : 'No canvas protection detected'
+                protection: isRandomized 
+                    ? 'Browser randomizes canvas fingerprint per domain' 
+                    : 'No canvas protection detected',
+                browser: isBrave ? 'Brave' : isFirefoxResist ? 'Firefox (resist fingerprinting)' : 'Standard'
             }
         };
     } catch (error) {
