@@ -193,16 +193,27 @@ const getUniquenessLevel = (bits) => {
 const estimateMatchingUsers = (bits) => {
     // Based on ~5 billion internet users and 2^bits uniqueness
     // We want to express this as "1 in X browsers" in simple terms
-    const uniqueFingerprints = Math.pow(2, bits);
+    const uniqueFingerprints = Math.pow(2, Math.min(bits, 50)); // Cap at 2^50 for display
     
     // Format large numbers in a readable way
     const formatNumber = (num) => {
+        if (num >= 1000000000000000) return 'quadrillions';
         if (num >= 1000000000000) return `${(num / 1000000000000).toFixed(0)} trillion`;
         if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)} billion`;
         if (num >= 1000000) return `${(num / 1000000).toFixed(1)} million`;
         if (num >= 1000) return `${(num / 1000).toFixed(0)} thousand`;
         return num.toFixed(0);
     };
+    
+    // For very high entropy (like 80 bits), just say unique
+    if (bits >= 50) {
+        return {
+            ratio: Infinity,
+            text: 'essentially unique worldwide',
+            simple: 'Your browser is essentially unique - easily trackable',
+            isGood: false
+        };
+    }
     
     if (bits >= 33) {
         return {
