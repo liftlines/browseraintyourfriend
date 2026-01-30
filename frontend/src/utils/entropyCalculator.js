@@ -183,25 +183,70 @@ export const calculateEntropy = (results) => {
 };
 
 const getUniquenessLevel = (bits) => {
-    if (bits >= 33) return { level: 'unique', label: 'Unique', description: 'Your browser has a unique fingerprint' };
-    if (bits >= 20) return { level: 'rare', label: 'Nearly Unique', description: 'Only a handful of browsers match yours' };
-    if (bits >= 15) return { level: 'uncommon', label: 'Uncommon', description: 'Your fingerprint is somewhat rare' };
-    if (bits >= 10) return { level: 'common', label: 'Common', description: 'Many browsers share similar fingerprints' };
-    return { level: 'anonymous', label: 'Anonymous', description: 'Your browser blends in with others' };
+    if (bits >= 33) return { level: 'unique', label: 'Highly Identifiable', description: 'Your browser can be uniquely identified' };
+    if (bits >= 20) return { level: 'rare', label: 'Easily Identifiable', description: 'Very few browsers share your fingerprint' };
+    if (bits >= 15) return { level: 'uncommon', label: 'Somewhat Identifiable', description: 'Your fingerprint is fairly uncommon' };
+    if (bits >= 10) return { level: 'common', label: 'Less Identifiable', description: 'Many browsers share similar fingerprints' };
+    return { level: 'anonymous', label: 'Hard to Identify', description: 'Your browser blends in well with others' };
 };
 
 const estimateMatchingUsers = (bits) => {
-    // Rough estimate: 2^bits represents uniqueness
-    // With ~5 billion internet users, calculate probability
+    // Based on ~5 billion internet users and 2^bits uniqueness
+    // We want to express this as "1 in X browsers" in simple terms
     const uniqueFingerprints = Math.pow(2, bits);
-    const totalUsers = 5000000000; // 5 billion
-    const matchingUsers = Math.max(1, Math.round(totalUsers / uniqueFingerprints));
     
-    if (matchingUsers === 1) return 'unique among all browsers';
-    if (matchingUsers < 100) return `1 in ${uniqueFingerprints.toLocaleString()} browsers`;
-    if (matchingUsers < 10000) return `about ${matchingUsers.toLocaleString()} others`;
-    if (matchingUsers < 1000000) return `about ${Math.round(matchingUsers / 1000)}K others`;
-    return `about ${Math.round(matchingUsers / 1000000)}M others`;
+    // Format large numbers in a readable way
+    const formatNumber = (num) => {
+        if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)} billion`;
+        if (num >= 1000000) return `${(num / 1000000).toFixed(1)} million`;
+        if (num >= 1000) return `${(num / 1000).toFixed(1)} thousand`;
+        return num.toFixed(0);
+    };
+    
+    if (bits >= 33) {
+        return {
+            ratio: uniqueFingerprints,
+            text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
+            simple: 'Your browser is essentially unique - easily trackable',
+            isGood: false
+        };
+    }
+    
+    if (bits >= 20) {
+        return {
+            ratio: uniqueFingerprints,
+            text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
+            simple: 'Very few browsers look like yours - easy to track',
+            isGood: false
+        };
+    }
+    
+    if (bits >= 15) {
+        return {
+            ratio: uniqueFingerprints,
+            text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
+            simple: 'Your browser stands out from most - trackable',
+            isGood: false
+        };
+    }
+    
+    if (bits >= 10) {
+        // Around 1000 matching browsers
+        return {
+            ratio: uniqueFingerprints,
+            text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
+            simple: 'Your browser looks like thousands of others - harder to track',
+            isGood: true
+        };
+    }
+    
+    // Less than 10 bits - very common
+    return {
+        ratio: uniqueFingerprints,
+        text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
+        simple: 'Your browser looks like millions of others - very hard to track',
+        isGood: true
+    };
 };
 
 // Protection recommendations based on results
