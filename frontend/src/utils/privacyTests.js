@@ -185,53 +185,16 @@ export const testCanvas = async () => {
     }
 };
 
-// 4. WebGL Fingerprinting - with randomization detection
+// 4. WebGL Fingerprinting - with Brave/Firefox protection detection
 export const testWebGL = async () => {
     try {
-        const getWebGLFingerprint = async () => {
-            const canvas = document.createElement('canvas');
-            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-            
-            if (!gl) return null;
-            
-            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-            const vendor = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : 'Unknown';
-            const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Unknown';
-            
-            // Create a WebGL fingerprint by rendering
-            const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-            gl.shaderSource(vertexShader, 'attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}');
-            gl.compileShader(vertexShader);
-            
-            const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-            gl.shaderSource(fragmentShader, 'precision mediump float;void main(){gl_FragColor=vec4(1,0,0,1);}');
-            gl.compileShader(fragmentShader);
-            
-            const program = gl.createProgram();
-            gl.attachShader(program, vertexShader);
-            gl.attachShader(program, fragmentShader);
-            gl.linkProgram(program);
-            gl.useProgram(program);
-            
-            const pixels = new Uint8Array(4);
-            gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-            
-            const hash = await hashString(canvas.toDataURL() + pixels.join(','));
-            
-            return {
-                vendor,
-                renderer,
-                hash,
-                version: gl.getParameter(gl.VERSION),
-                shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
-                maskedVendor: gl.getParameter(gl.VENDOR),
-                maskedRenderer: gl.getParameter(gl.RENDERER),
-                maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE)
-            };
-        };
+        // Check for Brave browser
+        const isBrave = navigator.brave && await navigator.brave.isBrave();
         
-        const fp1 = await getWebGLFingerprint();
-        if (!fp1) {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        
+        if (!gl) {
             return {
                 status: 'safe',
                 summary: 'WebGL not supported',
@@ -239,24 +202,43 @@ export const testWebGL = async () => {
             };
         }
         
-        const fp2 = await getWebGLFingerprint();
-        const isRandomized = fp1.hash !== fp2.hash;
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        const vendor = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : 'Unknown';
+        const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Unknown';
+        
+        // Brave randomizes WebGL hash per-first-party domain
+        const isRandomized = isBrave;
+        
+        // Also check if WebGL info is being blocked/spoofed
+        const isSpoofed = renderer === 'Unknown' || renderer.includes('BLOCKED');
+        
+        const params = {
+            version: gl.getParameter(gl.VERSION),
+            shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+            maskedVendor: gl.getParameter(gl.VENDOR),
+            maskedRenderer: gl.getParameter(gl.RENDERER),
+            unmaskedVendor: vendor,
+            unmaskedRenderer: renderer,
+            maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE)
+        };
         
         return {
-            status: isRandomized ? 'safe' : 'leak',
-            summary: isRandomized 
+            status: (isRandomized || isSpoofed) ? 'safe' : 'leak',
+            summary: (isRandomized || isSpoofed)
                 ? 'WebGL fingerprint is randomized (protected)' 
-                : `GPU: ${fp1.renderer.substring(0, 40)}${fp1.renderer.length > 40 ? '...' : ''}`,
+                : `GPU: ${renderer.substring(0, 40)}${renderer.length > 40 ? '...' : ''}`,
             details: {
                 supported: true,
                 randomized: isRandomized,
-                unmaskedVendor: fp1.vendor,
-                unmaskedRenderer: fp1.renderer,
-                version: fp1.version,
-                shadingLanguageVersion: fp1.shadingLanguageVersion,
-                maxTextureSize: fp1.maxTextureSize,
-                protection: isRandomized ? 'Browser is randomizing WebGL fingerprint' : 'No WebGL protection detected',
-                exposes: isRandomized ? [] : ['GPU model', 'Driver version', 'Hardware capabilities']
+                spoofed: isSpoofed,
+                ...params,
+                protection: isRandomized 
+                    ? 'Browser randomizes WebGL fingerprint per domain' 
+                    : isSpoofed 
+                        ? 'WebGL info is blocked/spoofed'
+                        : 'No WebGL protection detected',
+                exposes: (isRandomized || isSpoofed) ? [] : ['GPU model', 'Driver version', 'Hardware capabilities'],
+                browser: isBrave ? 'Brave' : 'Standard'
             }
         };
     } catch (error) {
