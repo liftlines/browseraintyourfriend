@@ -197,9 +197,10 @@ const estimateMatchingUsers = (bits) => {
     
     // Format large numbers in a readable way
     const formatNumber = (num) => {
+        if (num >= 1000000000000) return `${(num / 1000000000000).toFixed(0)} trillion`;
         if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)} billion`;
         if (num >= 1000000) return `${(num / 1000000).toFixed(1)} million`;
-        if (num >= 1000) return `${(num / 1000).toFixed(1)} thousand`;
+        if (num >= 1000) return `${(num / 1000).toFixed(0)} thousand`;
         return num.toFixed(0);
     };
     
