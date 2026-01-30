@@ -256,9 +256,20 @@ export const testWebGL = async () => {
     }
 };
 
-// 5. JavaScript / Browser Information
+// 5. JavaScript / Browser Information - with randomization detection
 export const testJavaScript = () => {
     const nav = navigator;
+    
+    // Check if hardware concurrency might be randomized
+    // Brave randomizes this - typical real values are 2, 4, 8, 12, 16, etc.
+    const hwConcurrency = nav.hardwareConcurrency || 0;
+    // Unusual values like 5, 7, 11, etc. suggest randomization
+    const typicalValues = [1, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64];
+    const isHwConcurrencyRandomized = hwConcurrency > 0 && !typicalValues.includes(hwConcurrency);
+    
+    // Check if plugins might be randomized (Brave returns empty or randomized)
+    const plugins = Array.from(nav.plugins || []).map(p => p.name).slice(0, 10);
+    const isPluginsRandomized = plugins.length === 0 || plugins.some(p => p.includes('randomized'));
     
     const details = {
         userAgent: nav.userAgent,
@@ -267,19 +278,28 @@ export const testJavaScript = () => {
         languages: nav.languages ? [...nav.languages] : [nav.language],
         cookiesEnabled: nav.cookieEnabled,
         doNotTrack: nav.doNotTrack || window.doNotTrack || nav.msDoNotTrack,
-        hardwareConcurrency: nav.hardwareConcurrency || 'Unknown',
+        hardwareConcurrency: hwConcurrency,
+        hardwareConcurrencyRandomized: isHwConcurrencyRandomized,
         maxTouchPoints: nav.maxTouchPoints || 0,
         deviceMemory: nav.deviceMemory || 'Unknown',
         pdfViewerEnabled: nav.pdfViewerEnabled,
         webdriver: nav.webdriver,
-        plugins: Array.from(nav.plugins || []).map(p => p.name).slice(0, 10),
+        plugins: plugins,
+        pluginsRandomized: isPluginsRandomized,
         mimeTypes: Array.from(nav.mimeTypes || []).map(m => m.type).slice(0, 10)
     };
     
+    const hasProtection = isHwConcurrencyRandomized || isPluginsRandomized;
+    
     return {
-        status: 'leak',
-        summary: `${details.platform} - ${details.hardwareConcurrency} cores`,
-        details
+        status: hasProtection ? 'warning' : 'leak',
+        summary: hasProtection 
+            ? `${details.platform} - some values randomized`
+            : `${details.platform} - ${details.hardwareConcurrency} cores`,
+        details: {
+            ...details,
+            protection: hasProtection ? 'Some browser values appear to be randomized' : 'No randomization detected'
+        }
     };
 };
 
