@@ -319,7 +319,7 @@ export const testFonts = async () => {
     };
 };
 
-// 8. Audio Fingerprint
+// 8. Audio Fingerprint - Simplified to avoid autoplay restrictions
 export const testAudio = async () => {
     try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -331,50 +331,48 @@ export const testAudio = async () => {
             };
         }
         
+        // Create context but don't start it - just check capabilities
         const context = new AudioContext();
-        const oscillator = context.createOscillator();
-        const analyser = context.createAnalyser();
-        const gainNode = context.createGain();
-        const scriptProcessor = context.createScriptProcessor(4096, 1, 1);
         
-        gainNode.gain.value = 0; // Mute
-        oscillator.type = 'triangle';
-        oscillator.frequency.value = 10000;
+        // Get audio context properties that can be used for fingerprinting
+        const details = {
+            supported: true,
+            sampleRate: context.sampleRate,
+            state: context.state,
+            baseLatency: context.baseLatency,
+            outputLatency: context.outputLatency,
+            channelCount: context.destination.channelCount,
+            maxChannelCount: context.destination.maxChannelCount,
+            numberOfInputs: context.destination.numberOfInputs,
+            numberOfOutputs: context.destination.numberOfOutputs
+        };
         
-        oscillator.connect(analyser);
-        analyser.connect(scriptProcessor);
-        scriptProcessor.connect(gainNode);
-        gainNode.connect(context.destination);
+        // Generate hash from these properties
+        const hash = await hashString(JSON.stringify(details));
         
-        oscillator.start(0);
-        
-        const fingerprint = await new Promise((resolve) => {
-            scriptProcessor.onaudioprocess = (event) => {
-                const data = event.inputBuffer.getChannelData(0);
-                const sum = data.reduce((acc, val) => acc + Math.abs(val), 0);
-                oscillator.stop();
-                context.close();
-                resolve(sum);
-            };
-        });
-        
-        const hash = await hashString(fingerprint.toString());
+        // Close context
+        await context.close();
         
         return {
             status: 'leak',
-            summary: 'Audio fingerprint generated',
+            summary: `Sample rate: ${details.sampleRate}Hz`,
             details: {
-                supported: true,
-                sampleRate: context.sampleRate,
+                ...details,
                 hash: hash.substring(0, 16),
-                uniqueIdentifier: true
+                uniqueIdentifier: true,
+                note: 'Audio properties can uniquely identify your device'
             }
         };
     } catch (error) {
         return {
-            status: 'unknown',
-            summary: 'Audio test failed',
-            details: { error: error.message }
+            status: 'warning',
+            summary: 'Audio API blocked',
+            details: { 
+                supported: true, 
+                blocked: true,
+                error: error.message,
+                note: 'Browser blocked audio fingerprinting'
+            }
         };
     }
 };
@@ -634,7 +632,7 @@ export const testMediaDevices = async () => {
     }
 };
 
-// Run all tests
+// Run all tests in parallel with timeout protection
 export const runAllTests = async () => {
     const tests = [
         { id: 'ip', name: 'IP Address', icon: 'globe', test: testIPAddress },
@@ -655,26 +653,41 @@ export const runAllTests = async () => {
         { id: 'media', name: 'Media Devices', icon: 'camera', test: testMediaDevices }
     ];
     
-    const results = {};
-    
-    for (const test of tests) {
+    // Helper to run test with timeout
+    const runWithTimeout = async (test, timeout = 5000) => {
         try {
-            const result = await test.test();
-            results[test.id] = {
+            const result = await Promise.race([
+                test.test(),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Test timeout')), timeout)
+                )
+            ]);
+            return {
                 ...result,
                 name: test.name,
                 icon: test.icon
             };
         } catch (error) {
-            results[test.id] = {
+            return {
                 name: test.name,
                 icon: test.icon,
                 status: 'unknown',
-                summary: 'Test failed',
+                summary: 'Test timed out',
                 details: { error: error.message }
             };
         }
-    }
+    };
+    
+    // Run all tests in parallel
+    const resultsArray = await Promise.all(
+        tests.map(test => runWithTimeout(test))
+    );
+    
+    // Convert to object
+    const results = {};
+    tests.forEach((test, index) => {
+        results[test.id] = resultsArray[index];
+    });
     
     return results;
 };
