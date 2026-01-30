@@ -155,6 +155,7 @@ export const calculateEntropy = (results) => {
     };
     
     let totalBits = 0;
+    let fingerprintBits = 0; // Comparable to EFF (excludes server-side data like IP)
     const breakdown = {};
     
     Object.entries(results).forEach(([key, result]) => {
@@ -163,21 +164,35 @@ export const calculateEntropy = (results) => {
         const config = entropyMap[key];
         let bits = 0;
         
+        // Only count bits if the test shows a leak or warning
+        // For 'safe' status, it means the browser is protected
         if (result.status === 'leak' || result.status === 'warning') {
             if (typeof config.baseBits === 'function') {
                 bits = config.baseBits(result.details);
             } else {
                 bits = config.baseBits;
             }
+        } else if (result.status === 'safe' && result.details?.randomized) {
+            // Even randomized values add some bits (reduced)
+            if (typeof config.baseBits === 'function') {
+                bits = Math.max(config.baseBits(result.details) * 0.15, 0); // 15% of original
+            }
         }
         
         breakdown[key] = {
-            bits,
+            bits: Math.round(bits * 100) / 100,
             description: config.description,
-            impact: config.leakImpact
+            impact: config.leakImpact,
+            protected: result.status === 'safe'
         };
         
         totalBits += bits;
+        
+        // Fingerprint bits excludes IP (server-side data) for EFF comparison
+        if (key !== 'ip') {
+            fingerprintBits += bits;
+        }
+    });
     });
     
     return {
