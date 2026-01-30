@@ -145,17 +145,37 @@ const LeakCard = ({ data, index }) => {
                 </Button>
                 
                 {expanded && data.details && (
-                    <div className="mt-3 p-3 bg-muted/30 rounded-lg border border-border/50 space-y-2 animate-fade-in">
-                        {Object.entries(data.details).map(([key, value]) => (
-                            <div key={key} className="flex justify-between items-start gap-4 text-xs">
-                                <span className="text-muted-foreground font-medium shrink-0">
-                                    {formatKey(key)}:
-                                </span>
-                                <span className="text-foreground text-right break-all font-mono">
-                                    {renderDetailValue(key, value)}
-                                </span>
+                    <div className="mt-3 space-y-3 animate-fade-in">
+                        {/* Risk explanation */}
+                        {data.status === 'leak' && (
+                            <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                                <p className="text-xs text-destructive/90">
+                                    <strong>Risk:</strong> {explanation.risk}
+                                </p>
                             </div>
-                        ))}
+                        )}
+                        
+                        {/* Protection tip */}
+                        <div className="p-3 bg-success/5 border border-success/20 rounded-lg">
+                            <p className="text-xs text-success/90">
+                                <strong>Protect:</strong> {explanation.protect}
+                            </p>
+                        </div>
+                        
+                        {/* Technical details */}
+                        <div className="p-3 bg-muted/30 rounded-lg border border-border/50 space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Technical Details:</p>
+                            {Object.entries(data.details).map(([key, value]) => (
+                                <div key={key} className="flex justify-between items-start gap-4 text-xs">
+                                    <span className="text-muted-foreground font-medium shrink-0">
+                                        {formatKey(key)}:
+                                    </span>
+                                    <span className="text-foreground text-right break-all font-mono">
+                                        {renderDetailValue(key, value)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </CardContent>
