@@ -66,7 +66,7 @@ const UniquenessCard = ({ entropy }) => {
                         </div>
                         <div>
                             <CardTitle className="font-serif text-xl text-foreground flex items-center gap-2">
-                                Browser Fingerprint Uniqueness
+                                How Identifiable Is Your Browser?
                                 <TooltipProvider>
                                     <Tooltip>
                                         <TooltipTrigger>
@@ -74,15 +74,15 @@ const UniquenessCard = ({ entropy }) => {
                                         </TooltipTrigger>
                                         <TooltipContent className="max-w-xs">
                                             <p>
-                                                Entropy measures how unique your browser fingerprint is.
-                                                Higher bits = more unique = easier to track.
+                                                Higher &quot;bits&quot; = more unique = easier to track you.
+                                                Think of it like a game where more bits means fewer people look like you online.
                                             </p>
                                         </TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
                             </CardTitle>
                             <p className="text-sm text-muted-foreground mt-1">
-                                How identifiable is your browser?
+                                Can websites tell you apart from other users?
                             </p>
                         </div>
                     </div>
@@ -96,33 +96,31 @@ const UniquenessCard = ({ entropy }) => {
             </CardHeader>
             
             <CardContent className="space-y-6">
+                {/* Simple Explanation First */}
+                <div className={`p-4 rounded-lg border ${usersWithSameFingerprint.isGood ? 'bg-success/5 border-success/30' : 'bg-destructive/5 border-destructive/30'}`}>
+                    <p className={`text-lg font-medium ${usersWithSameFingerprint.isGood ? 'text-success' : 'text-destructive'}`}>
+                        {usersWithSameFingerprint.simple}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                        Your browser looks like <strong className="text-foreground">{usersWithSameFingerprint.text}</strong>
+                    </p>
+                </div>
+
                 {/* Entropy Score */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Identifying Information</span>
                         <span className={`font-mono font-bold ${getColorClass(uniqueness.level)}`}>
-                            {totalBits.toFixed(1)} bits of entropy
+                            {totalBits.toFixed(1)} bits
                         </span>
                     </div>
                     <Progress 
                         value={percentage} 
                         className="h-2 bg-muted"
                     />
-                    <p className="text-xs text-muted-foreground">
-                        {uniqueness.description}
-                    </p>
-                </div>
-                
-                {/* Matching Users */}
-                <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
-                    <Users className="h-8 w-8 text-muted-foreground" />
-                    <div>
-                        <p className="text-sm font-medium text-foreground">
-                            Your fingerprint matches
-                        </p>
-                        <p className={`text-lg font-serif ${getColorClass(uniqueness.level)}`}>
-                            {usersWithSameFingerprint}
-                        </p>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Less identifiable</span>
+                        <span>More identifiable</span>
                     </div>
                 </div>
                 
@@ -131,7 +129,7 @@ const UniquenessCard = ({ entropy }) => {
                     <div className="space-y-3">
                         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                             <TrendingUp className="h-4 w-4" />
-                            Top Identifying Factors
+                            What Makes You Identifiable
                         </div>
                         <div className="space-y-2">
                             {topFactors.map(([key, data]) => (
@@ -158,12 +156,17 @@ const UniquenessCard = ({ entropy }) => {
                     </div>
                 )}
                 
-                {/* Explanation */}
+                {/* Simplified Explanation */}
                 <div className="text-xs text-muted-foreground border-t border-border pt-4">
                     <p>
-                        <strong>What is entropy?</strong> Entropy measures uniqueness in bits. 
-                        Each bit doubles the number of possible fingerprints. With {totalBits.toFixed(1)} bits, 
-                        your browser is one of approximately {Math.pow(2, Math.round(totalBits)).toLocaleString()} possible combinations.
+                        <strong>What does this mean?</strong> The more &quot;bits&quot; of identifying information your browser reveals, 
+                        the easier it is for websites to pick you out of the crowd. With {totalBits.toFixed(0)} bits, 
+                        {totalBits >= 20 
+                            ? ' you stand out like a needle in a haystack - websites can easily track you.' 
+                            : totalBits >= 10 
+                                ? ' you blend in somewhat, but could still be identified.' 
+                                : ' you blend in well with many other users.'
+                        }
                     </p>
                 </div>
             </CardContent>
