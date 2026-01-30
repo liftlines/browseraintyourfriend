@@ -32,7 +32,10 @@ const iconMap = {
     wifi: Wifi,
     info: Info,
     database: Database,
-    camera: Camera
+    camera: Camera,
+    hand: Hand,
+    shield: Shield,
+    fileText: FileText
 };
 
 const statusConfig = {
