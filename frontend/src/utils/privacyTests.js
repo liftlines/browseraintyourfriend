@@ -28,24 +28,41 @@ export const testIPAddress = async () => {
             // IPv6 not available
         }
         
-        // Check for VPN/Proxy indicators
-        const isVpn = data.org?.toLowerCase().includes('vpn') || 
-                      data.org?.toLowerCase().includes('proxy') ||
-                      data.org?.toLowerCase().includes('hosting') ||
-                      data.org?.toLowerCase().includes('datacenter') ||
-                      data.org?.toLowerCase().includes('cloud') ||
-                      data.asn?.toString().startsWith('AS') && (
-                          ['AS9009', 'AS20473', 'AS16276', 'AS14061', 'AS396982'].includes(data.asn) // Common VPN ASNs
-                      );
+        // VPN/Proxy Detection - Check multiple indicators
+        const orgLower = (data.org || '').toLowerCase();
+        const isVpnByOrg = orgLower.includes('vpn') || 
+                          orgLower.includes('proxy') ||
+                          orgLower.includes('hosting') ||
+                          orgLower.includes('datacenter') ||
+                          orgLower.includes('server') ||
+                          orgLower.includes('cloud') ||
+                          orgLower.includes('digital ocean') ||
+                          orgLower.includes('amazon') ||
+                          orgLower.includes('google cloud') ||
+                          orgLower.includes('microsoft') ||
+                          orgLower.includes('linode') ||
+                          orgLower.includes('vultr') ||
+                          orgLower.includes('ovh');
         
-        // Check timezone vs IP location mismatch (possible VPN indicator)
+        // Common VPN provider ASNs
+        const vpnAsns = ['AS9009', 'AS20473', 'AS16276', 'AS14061', 'AS396982', 'AS13335', 
+                        'AS14618', 'AS16509', 'AS15169', 'AS8075', 'AS63949', 'AS46606'];
+        const isVpnByAsn = vpnAsns.some(asn => String(data.asn).includes(asn.replace('AS', '')));
+        
+        // Check timezone vs IP location mismatch (strong VPN indicator)
         const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const ipTimezone = data.timezone;
-        const timezoneMismatch = browserTimezone !== ipTimezone;
+        const timezoneMismatch = ipTimezone && browserTimezone !== ipTimezone;
         
-        const status = isVpn ? 'warning' : 'leak';
+        // Determine if VPN is likely being used
+        const isVpn = isVpnByOrg || isVpnByAsn || timezoneMismatch;
+        
+        // Assessment logic:
+        // - VPN detected = "protected" (your real IP is hidden)
+        // - No VPN = "leak" (your real IP is exposed)
+        const status = isVpn ? 'safe' : 'leak';
         const summary = isVpn 
-            ? `VPN/Proxy detected (${data.ip})`
+            ? `VPN/Proxy detected - real IP hidden`
             : `Your real IP is visible (${data.ip})`;
         
         return {
@@ -57,7 +74,7 @@ export const testIPAddress = async () => {
                 ipv6: ipv6,
                 ipVersion: data.version || 'IPv4',
                 
-                // Location Info (like BrowserLeaks)
+                // Location Info
                 country: data.country_name,
                 countryCode: data.country_code,
                 region: data.region,
@@ -65,22 +82,28 @@ export const testIPAddress = async () => {
                 postalCode: data.postal,
                 latitude: data.latitude,
                 longitude: data.longitude,
-                timezone: data.timezone,
+                ipTimezone: ipTimezone,
                 
                 // Network Info
                 isp: data.org,
                 asn: data.asn,
                 
-                // VPN/Proxy Detection
+                // VPN/Proxy Detection Results
                 vpnDetected: isVpn,
-                timezoneMismatch: timezoneMismatch,
+                vpnIndicators: {
+                    orgNameMatch: isVpnByOrg,
+                    asnMatch: isVpnByAsn,
+                    timezoneMismatch: timezoneMismatch
+                },
                 browserTimezone: browserTimezone,
                 
-                // Risk Assessment
-                exposed: !isVpn,
+                // Assessment
+                assessment: isVpn 
+                    ? 'PROTECTED: Your real IP is hidden behind a VPN/Proxy'
+                    : 'EXPOSED: Your real IP address and location are visible to websites',
                 privacyNote: isVpn 
-                    ? 'VPN/Proxy detected - your real IP is hidden but VPN IP still reveals approximate location'
-                    : 'Your real IP address is exposed - websites can see your location and ISP'
+                    ? 'Good - VPN detected. Your real IP is hidden, though the VPN exit location is visible.'
+                    : 'Risk - Your real IP reveals your location, ISP, and can be used to identify you.'
             }
         };
     } catch (error) {
