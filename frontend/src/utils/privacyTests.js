@@ -281,6 +281,7 @@ export const testWebGL = async () => {
         
         const canvas = document.createElement('canvas');
         const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        const gl2 = canvas.getContext('webgl2');
         
         if (!gl) {
             return {
@@ -300,15 +301,28 @@ export const testWebGL = async () => {
         // Also check if WebGL info is being blocked/spoofed
         const isSpoofed = renderer === 'Unknown' || renderer.includes('BLOCKED');
         
-        const params = {
-            version: gl.getParameter(gl.VERSION),
-            shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
-            maskedVendor: gl.getParameter(gl.VENDOR),
-            maskedRenderer: gl.getParameter(gl.RENDERER),
-            unmaskedVendor: vendor,
-            unmaskedRenderer: renderer,
-            maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE)
-        };
+        // Generate WebGL fingerprint hash (like BrowserLeaks)
+        const fingerprintData = [
+            gl.getParameter(gl.VERSION),
+            gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+            vendor,
+            renderer,
+            gl.getParameter(gl.MAX_TEXTURE_SIZE),
+            gl.getParameter(gl.MAX_VERTEX_ATTRIBS),
+            gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS),
+            gl.getParameter(gl.MAX_VARYING_VECTORS),
+            gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS),
+            gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
+            gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS),
+            gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE),
+            gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+            gl.getParameter(gl.MAX_VIEWPORT_DIMS)?.join(',')
+        ].join('~');
+        
+        const webglHash = await hashString(fingerprintData);
+        
+        // Get supported extensions
+        const extensions = gl.getSupportedExtensions() || [];
         
         return {
             status: (isRandomized || isSpoofed) ? 'safe' : 'leak',
@@ -316,17 +330,58 @@ export const testWebGL = async () => {
                 ? 'WebGL fingerprint is randomized (protected)' 
                 : `GPU: ${renderer.substring(0, 40)}${renderer.length > 40 ? '...' : ''}`,
             details: {
-                supported: true,
+                // Support Detection (like BrowserLeaks)
+                webglSupported: true,
+                webgl2Supported: !!gl2,
+                
+                // Fingerprint Hash (like BrowserLeaks)
+                webglReportHash: webglHash.substring(0, 32),
+                
+                // Context Info (like BrowserLeaks)
+                glVersion: gl.getParameter(gl.VERSION),
+                shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+                vendor: gl.getParameter(gl.VENDOR),
+                renderer: gl.getParameter(gl.RENDERER),
+                
+                // Debug Renderer Info (like BrowserLeaks - marked with !)
+                unmaskedVendor: vendor,
+                unmaskedRenderer: renderer,
+                
+                // Vertex Shader
+                maxVertexAttribs: gl.getParameter(gl.MAX_VERTEX_ATTRIBS),
+                maxVertexUniformVectors: gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS),
+                maxVertexTextureImageUnits: gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS),
+                maxVaryingVectors: gl.getParameter(gl.MAX_VARYING_VECTORS),
+                
+                // Fragment Shader  
+                maxFragmentUniformVectors: gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS),
+                maxTextureImageUnits: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
+                
+                // Textures
+                maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+                maxCubeMapTextureSize: gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE),
+                maxCombinedTextureImageUnits: gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS),
+                
+                // Framebuffer
+                maxRenderBufferSize: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+                maxViewportDims: gl.getParameter(gl.MAX_VIEWPORT_DIMS)?.join(' x '),
+                
+                // Extensions count
+                extensionsCount: extensions.length,
+                
+                // Protection Status
                 randomized: isRandomized,
                 spoofed: isSpoofed,
-                ...params,
                 protection: isRandomized 
-                    ? 'Browser randomizes WebGL fingerprint per domain' 
+                    ? 'Browser randomizes WebGL per first-party domain' 
                     : isSpoofed 
                         ? 'WebGL info is blocked/spoofed'
                         : 'No WebGL protection detected',
-                exposes: (isRandomized || isSpoofed) ? [] : ['GPU model', 'Driver version', 'Hardware capabilities'],
-                browser: isBrave ? 'Brave' : 'Standard'
+                browser: isBrave ? 'Brave (Shields Up)' : 'Standard',
+                
+                privacyNote: (isRandomized || isSpoofed)
+                    ? 'Your browser is protecting you from WebGL fingerprinting'
+                    : 'WebGL exposes detailed GPU information that can uniquely identify your device'
             }
         };
     } catch (error) {
