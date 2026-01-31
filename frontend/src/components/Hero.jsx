@@ -1,15 +1,10 @@
 import React from 'react';
 import { ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react';
 
-const Hero = ({ stats, isScanning, entropy }) => {
-    const getPrivacyScore = () => {
-        if (!stats || stats.total === 0) return null;
-        const safePercentage = (stats.safe / stats.total) * 100;
-        return Math.round(safePercentage);
-    };
-    
-    const score = getPrivacyScore();
-    const isGood = score !== null && score >= 50;
+const Hero = ({ stats, isScanning, privacyData }) => {
+    // Use privacy score from new system
+    const privacyScore = privacyData?.privacyScore || 0;
+    const isGood = privacyScore >= 50;
     
     return (
         <section className="pt-32 pb-16 px-4 sm:px-6 lg:px-8">
@@ -53,7 +48,7 @@ const Hero = ({ stats, isScanning, entropy }) => {
                                             Scanning...
                                         </span>
                                     </>
-                                ) : score !== null ? (
+                                ) : privacyData ? (
                                     <>
                                         {isGood ? (
                                             <ShieldCheck className="h-8 w-8 text-success mb-1" />
@@ -63,10 +58,10 @@ const Hero = ({ stats, isScanning, entropy }) => {
                                         <span className={`text-3xl font-serif font-medium ${
                                             isGood ? 'text-success' : 'text-destructive'
                                         }`}>
-                                            {score}%
+                                            {privacyScore}%
                                         </span>
                                         <span className="text-xs text-muted-foreground font-sans mt-1">
-                                            Protected
+                                            Privacy Score
                                         </span>
                                     </>
                                 ) : (
@@ -114,20 +109,20 @@ const Hero = ({ stats, isScanning, entropy }) => {
                             </div>
                         </div>
                         
-                        {/* Entropy summary */}
-                        {entropy && (
+                        {/* Items summary */}
+                        {privacyData && (
                             <div className="text-center px-4 py-2 bg-muted/30 rounded-full border border-border">
                                 <span className="text-sm text-muted-foreground font-sans">
-                                    Fingerprint uniqueness: 
+                                    Identifying items exposed: 
                                 </span>
                                 <span className={`text-sm font-medium ml-1 ${
-                                    entropy.uniqueness.level === 'unique' || entropy.uniqueness.level === 'rare' 
-                                        ? 'text-destructive' 
-                                        : entropy.uniqueness.level === 'uncommon'
+                                    privacyData.totalItems <= 5 
+                                        ? 'text-success' 
+                                        : privacyData.totalItems <= 10
                                             ? 'text-warning'
-                                            : 'text-success'
+                                            : 'text-destructive'
                                 }`}>
-                                    {(entropy.fingerprintBits || entropy.totalBits).toFixed(1)} bits ({entropy.uniqueness.label})
+                                    {privacyData.totalItems} of {privacyData.maxPossibleItems}
                                 </span>
                             </div>
                         )}
