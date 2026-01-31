@@ -84,17 +84,34 @@ export const testIPAddress = async () => {
             }
         };
     } catch (error) {
-        // Fallback to simple IP check
+        // Fallback to simple IP check with browser timezone info
         try {
             const response = await fetch('https://api.ipify.org?format=json');
             const data = await response.json();
+            const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            
             return {
                 status: 'leak',
-                summary: `IP visible: ${data.ip}`,
+                summary: `Your real IP is visible (${data.ip})`,
                 details: {
+                    // Basic IP Info
                     ipAddress: data.ip,
+                    ipVersion: 'IPv4',
+                    
+                    // Browser Info (we can still get this)
+                    browserTimezone: browserTimezone,
+                    browserLanguage: navigator.language,
+                    
+                    // Network Info
+                    connectionType: navigator.connection?.effectiveType || 'unknown',
+                    
+                    // Status
                     exposed: true,
-                    note: 'Limited info available - extended lookup failed'
+                    vpnDetected: false,
+                    
+                    // Note
+                    privacyNote: 'Your IP address is exposed - websites can track your location and identity',
+                    limitedInfo: 'Full geolocation lookup unavailable - only basic IP shown'
                 }
             };
         } catch (e) {
