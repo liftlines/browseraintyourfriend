@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Fingerprint, TrendingUp, Info } from 'lucide-react';
+import { Fingerprint, TrendingUp, Info, ShieldCheck, ShieldAlert } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
@@ -10,53 +10,40 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-const UniquenessCard = ({ entropy }) => {
-    if (!entropy) return null;
+const UniquenessCard = ({ privacyData }) => {
+    if (!privacyData) return null;
     
-    const { totalBits, fingerprintBits, uniqueness, usersWithSameFingerprint, breakdown } = entropy;
+    const { totalItems, maxPossibleItems, privacyScore, assessment, trackability, breakdown } = privacyData;
     
-    // Use fingerprintBits for display (comparable to EFF)
-    const displayBits = fingerprintBits || totalBits;
+    // Color based on privacy score
+    const getColorClass = (score) => {
+        if (score >= 80) return 'text-success';
+        if (score >= 60) return 'text-warning';
+        if (score >= 40) return 'text-warning';
+        return 'text-destructive';
+    };
     
-    // Calculate percentage for visual (max out at 40 bits for UI purposes)
-    const maxBits = 40;
-    const percentage = Math.min((displayBits / maxBits) * 100, 100);
+    const getBgClass = (score) => {
+        if (score >= 80) return 'bg-success/20';
+        if (score >= 60) return 'bg-warning/20';
+        if (score >= 40) return 'bg-warning/20';
+        return 'bg-destructive/20';
+    };
     
-    // Color based on uniqueness level
-    const getColorClass = (level) => {
+    const getTrackabilityColor = (level) => {
         switch (level) {
-            case 'unique':
-            case 'rare':
-                return 'text-destructive';
-            case 'uncommon':
-                return 'text-warning';
-            case 'common':
-            case 'anonymous':
-                return 'text-success';
-            default:
-                return 'text-muted-foreground';
+            case 'low': return 'text-success';
+            case 'medium': return 'text-warning';
+            case 'high': return 'text-destructive';
+            case 'very-high': return 'text-destructive';
+            default: return 'text-muted-foreground';
         }
     };
     
-    const getBgClass = (level) => {
-        switch (level) {
-            case 'unique':
-            case 'rare':
-                return 'bg-destructive/20';
-            case 'uncommon':
-                return 'bg-warning/20';
-            case 'common':
-            case 'anonymous':
-                return 'bg-success/20';
-            default:
-                return 'bg-muted';
-        }
-    };
-    
-    // Get top contributing factors
-    const topFactors = Object.entries(breakdown)
-        .filter(([_, data]) => data.bits > 0)
-        .sort((a, b) => b[1].bits - a[1].bits)
+    // Get top exposed items for display
+    const exposedItems = Object.entries(breakdown)
+        .filter(([_, data]) => data.items > 0)
+        .sort((a, b) => b[1].items - a[1].items)
         .slice(0, 5);
     
     return (
@@ -64,12 +51,16 @@ const UniquenessCard = ({ entropy }) => {
             <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className={`p-3 rounded-lg ${getBgClass(uniqueness.level)}`}>
-                            <Fingerprint className={`h-6 w-6 ${getColorClass(uniqueness.level)}`} />
+                        <div className={`p-3 rounded-lg ${getBgClass(privacyScore)}`}>
+                            {privacyScore >= 60 ? (
+                                <ShieldCheck className={`h-6 w-6 ${getColorClass(privacyScore)}`} />
+                            ) : (
+                                <ShieldAlert className={`h-6 w-6 ${getColorClass(privacyScore)}`} />
+                            )}
                         </div>
                         <div>
                             <CardTitle className="font-serif text-xl text-foreground flex items-center gap-2">
-                                How Identifiable Is Your Browser?
+                                Privacy Assessment
                                 <TooltipProvider>
                                     <Tooltip>
                                         <TooltipTrigger>
@@ -77,81 +68,101 @@ const UniquenessCard = ({ entropy }) => {
                                         </TooltipTrigger>
                                         <TooltipContent className="max-w-xs">
                                             <p>
-                                                Higher &quot;bits&quot; = more unique = easier to track you.
-                                                Think of it like a game where more bits means fewer people look like you online.
+                                                We count how many identifying items of information your browser exposes.
+                                                Fewer items = harder to track.
                                             </p>
                                         </TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
                             </CardTitle>
                             <p className="text-sm text-muted-foreground mt-1">
-                                Can websites tell you apart from other users?
+                                How trackable is your browser?
                             </p>
                         </div>
                     </div>
                     <Badge 
                         variant="outline" 
-                        className={`${getColorClass(uniqueness.level)} border-current text-sm px-3 py-1`}
+                        className={`${getColorClass(privacyScore)} border-current text-sm px-3 py-1`}
                     >
-                        {uniqueness.label}
+                        {assessment.label}
                     </Badge>
                 </div>
             </CardHeader>
             
             <CardContent className="space-y-6">
-                {/* Simple Explanation First */}
-                <div className={`p-4 rounded-lg border ${usersWithSameFingerprint.isGood ? 'bg-success/5 border-success/30' : 'bg-destructive/5 border-destructive/30'}`}>
-                    <p className={`text-lg font-medium ${usersWithSameFingerprint.isGood ? 'text-success' : 'text-destructive'}`}>
-                        {usersWithSameFingerprint.simple}
+                {/* Main Assessment Message */}
+                <div className={`p-4 rounded-lg border ${
+                    trackability.level === 'low' || trackability.level === 'medium'
+                        ? 'bg-success/5 border-success/30' 
+                        : 'bg-destructive/5 border-destructive/30'
+                }`}>
+                    <p className={`text-lg font-medium ${getTrackabilityColor(trackability.level)}`}>
+                        {trackability.message}
                     </p>
                     <p className="text-sm text-muted-foreground mt-2">
-                        Your browser looks like <strong className="text-foreground">{usersWithSameFingerprint.text}</strong>
+                        {trackability.detail}
                     </p>
                 </div>
 
-                {/* Entropy Score */}
+                {/* Privacy Score Bar */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Browser Fingerprint</span>
-                        <span className={`font-mono font-bold ${getColorClass(uniqueness.level)}`}>
-                            {displayBits.toFixed(1)} bits
+                        <span className="text-sm text-muted-foreground">Privacy Score</span>
+                        <span className={`font-bold ${getColorClass(privacyScore)}`}>
+                            {privacyScore}%
                         </span>
                     </div>
                     <Progress 
-                        value={percentage} 
-                        className="h-2 bg-muted"
+                        value={privacyScore} 
+                        className="h-3 bg-muted"
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Less identifiable</span>
-                        <span>More identifiable</span>
+                        <span>Not Protected</span>
+                        <span>Well Protected</span>
                     </div>
                 </div>
                 
-                {/* Top Contributing Factors */}
-                {topFactors.length > 0 && (
+                {/* Items Count */}
+                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                    <div>
+                        <p className="text-sm font-medium text-foreground">
+                            Identifying Information Exposed
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Items websites can use to track you
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <p className={`text-2xl font-bold ${getColorClass(privacyScore)}`}>
+                            {totalItems}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            of {maxPossibleItems} items
+                        </p>
+                    </div>
+                </div>
+                
+                {/* Top Exposed Items */}
+                {exposedItems.length > 0 && (
                     <div className="space-y-3">
                         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                             <TrendingUp className="h-4 w-4" />
-                            What Makes You Identifiable
+                            Exposed Information
                         </div>
                         <div className="space-y-2">
-                            {topFactors.map(([key, data]) => (
+                            {exposedItems.map(([key, data]) => (
                                 <div 
                                     key={key}
                                     className="flex items-center justify-between p-2 bg-muted/20 rounded-md"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <div className={`w-2 h-2 rounded-full ${
-                                            data.impact === 'high' ? 'bg-destructive' :
-                                            data.impact === 'medium' ? 'bg-warning' :
-                                            'bg-muted-foreground'
-                                        }`} />
+                                        <div className="w-2 h-2 rounded-full bg-destructive" />
                                         <span className="text-sm text-foreground capitalize">
-                                            {key.replace(/([A-Z])/g, ' $1').trim()}
+                                            {data.description}
                                         </span>
                                     </div>
-                                    <span className="text-xs font-mono text-muted-foreground">
-                                        +{data.bits} bits
+                                    <span className="text-xs text-muted-foreground">
+                                        {data.items} item{data.items > 1 ? 's' : ''}
                                     </span>
                                 </div>
                             ))}
@@ -159,23 +170,18 @@ const UniquenessCard = ({ entropy }) => {
                     </div>
                 )}
                 
-                {/* Simplified Explanation */}
+                {/* Simple Explanation */}
                 <div className="text-xs text-muted-foreground border-t border-border pt-4">
                     <p>
-                        <strong>What does this mean?</strong> The more &quot;bits&quot; of identifying information your browser reveals, 
-                        the easier it is for websites to pick you out of the crowd. With {displayBits.toFixed(1)} bits, 
-                        {displayBits >= 20 
-                            ? ' you stand out like a needle in a haystack - websites can easily track you.' 
-                            : displayBits >= 10 
-                                ? ' you blend in somewhat, but could still be identified.' 
-                                : ' you blend in well with many other users.'
+                        <strong>What does this mean?</strong> Websites collect identifying information from your browser
+                        to create a &quot;fingerprint&quot; that can track you. The more items exposed, the easier you are to track.
+                        {totalItems > 10 
+                            ? ' Your browser exposes many identifying details - consider using privacy tools.' 
+                            : totalItems > 5 
+                                ? ' Your browser has some protection but could be improved.' 
+                                : ' Your browser is well protected against tracking.'
                         }
                     </p>
-                    {totalBits !== displayBits && (
-                        <p className="mt-2 text-muted-foreground/70">
-                            <em>Note: Your IP address adds ~18 additional bits of identifying info (not included above as it&apos;s server-side data).</em>
-                        </p>
-                    )}
                 </div>
             </CardContent>
         </Card>
