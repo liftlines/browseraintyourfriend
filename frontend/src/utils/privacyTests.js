@@ -272,36 +272,8 @@ export const testCanvas = async () => {
         };
     }
 };
-        // So we check if Brave is detected with shields up
-        const isRandomized = isBrave || isFirefoxResist;
-        
-        return {
-            status: isRandomized ? 'safe' : 'leak',
-            summary: isRandomized 
-                ? 'Canvas fingerprint is randomized (protected)' 
-                : 'Canvas fingerprint is unique',
-            details: {
-                hash: hash.substring(0, 32) + '...',
-                fullHash: hash,
-                supported: true,
-                randomized: isRandomized,
-                uniqueIdentifier: !isRandomized,
-                protection: isRandomized 
-                    ? 'Browser randomizes canvas fingerprint per domain' 
-                    : 'No canvas protection detected',
-                browser: isBrave ? 'Brave' : isFirefoxResist ? 'Firefox (resist fingerprinting)' : 'Standard'
-            }
-        };
-    } catch (error) {
-        return {
-            status: 'unknown',
-            summary: 'Canvas test failed',
-            details: { error: error.message }
-        };
-    }
-};
 
-// 4. WebGL Fingerprinting - with Brave/Firefox protection detection
+// 4. WebGL Fingerprinting - Enhanced with BrowserLeaks-style details
 export const testWebGL = async () => {
     try {
         // Check for Brave browser
