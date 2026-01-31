@@ -9,10 +9,11 @@ const hashString = async (str) => {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// 1. IP Address Detection
+// 1. IP Address Detection - Enhanced with VPN/Proxy detection
 export const testIPAddress = async () => {
     try {
-        const response = await fetch('https://api.ipify.org?format=json');
+        // Get IP with geolocation info
+        const response = await fetch('https://ipapi.co/json/');
         const data = await response.json();
         
         // Also try to get IPv6
@@ -27,21 +28,82 @@ export const testIPAddress = async () => {
             // IPv6 not available
         }
         
+        // Check for VPN/Proxy indicators
+        const isVpn = data.org?.toLowerCase().includes('vpn') || 
+                      data.org?.toLowerCase().includes('proxy') ||
+                      data.org?.toLowerCase().includes('hosting') ||
+                      data.org?.toLowerCase().includes('datacenter') ||
+                      data.org?.toLowerCase().includes('cloud') ||
+                      data.asn?.toString().startsWith('AS') && (
+                          ['AS9009', 'AS20473', 'AS16276', 'AS14061', 'AS396982'].includes(data.asn) // Common VPN ASNs
+                      );
+        
+        // Check timezone vs IP location mismatch (possible VPN indicator)
+        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const ipTimezone = data.timezone;
+        const timezoneMismatch = browserTimezone !== ipTimezone;
+        
+        const status = isVpn ? 'warning' : 'leak';
+        const summary = isVpn 
+            ? `VPN/Proxy detected (${data.ip})`
+            : `Your real IP is visible (${data.ip})`;
+        
         return {
-            status: 'leak',
-            summary: 'Your IP address is visible',
+            status,
+            summary,
             details: {
-                ipv4: data.ip,
+                // Basic IP Info
+                ipAddress: data.ip,
                 ipv6: ipv6,
-                exposed: true
+                ipVersion: data.version || 'IPv4',
+                
+                // Location Info (like BrowserLeaks)
+                country: data.country_name,
+                countryCode: data.country_code,
+                region: data.region,
+                city: data.city,
+                postalCode: data.postal,
+                latitude: data.latitude,
+                longitude: data.longitude,
+                timezone: data.timezone,
+                
+                // Network Info
+                isp: data.org,
+                asn: data.asn,
+                
+                // VPN/Proxy Detection
+                vpnDetected: isVpn,
+                timezoneMismatch: timezoneMismatch,
+                browserTimezone: browserTimezone,
+                
+                // Risk Assessment
+                exposed: !isVpn,
+                privacyNote: isVpn 
+                    ? 'VPN/Proxy detected - your real IP is hidden but VPN IP still reveals approximate location'
+                    : 'Your real IP address is exposed - websites can see your location and ISP'
             }
         };
     } catch (error) {
-        return {
-            status: 'unknown',
-            summary: 'Could not detect IP',
-            details: { error: error.message }
-        };
+        // Fallback to simple IP check
+        try {
+            const response = await fetch('https://api.ipify.org?format=json');
+            const data = await response.json();
+            return {
+                status: 'leak',
+                summary: `IP visible: ${data.ip}`,
+                details: {
+                    ipAddress: data.ip,
+                    exposed: true,
+                    note: 'Limited info available - extended lookup failed'
+                }
+            };
+        } catch (e) {
+            return {
+                status: 'unknown',
+                summary: 'Could not detect IP',
+                details: { error: error.message }
+            };
+        }
     }
 };
 
