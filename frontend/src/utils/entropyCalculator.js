@@ -1,350 +1,370 @@
-// Entropy and Uniqueness Calculations
-// Inspired by EFF Cover Your Tracks
-// Uses more accurate bit values based on EFF's methodology
+// Privacy Score Calculator
+// Counts identifying items of information exposed by your browser
 
-export const calculateEntropy = (results) => {
-    const entropyMap = {
-        // IP Address - ~18 bits when exposed, reduced when VPN detected
+export const calculatePrivacyScore = (results) => {
+    // Define what counts as an "item" of identifying information
+    // Each item is something that can help identify/track you
+    const itemsMap = {
         ip: {
-            baseBits: (details) => {
-                if (details?.vpnDetected) return 8; // VPN still reveals some info (VPN provider, exit node region)
-                if (details?.exposed) return 18;
+            getItems: (details) => {
+                if (!details) return 0;
+                // VPN = protected, no items exposed
+                if (details.vpnDetected) return 0;
+                // Real IP exposed = 3 items (IP, location, ISP)
+                return 3;
+            },
+            maxItems: 3,
+            description: 'IP address, location, and ISP'
+        },
+        
+        webrtc: {
+            getItems: (details) => {
+                if (!details) return 0;
+                if (details.leaking === false) return 0;
+                let items = 0;
+                if (details.localIPs?.length > 0) items += 1; // Local IP leaked
+                if (details.publicIPs?.length > 0) items += 1; // Public IP leaked
+                return items;
+            },
+            maxItems: 2,
+            description: 'Local and public IP addresses'
+        },
+        
+        canvas: {
+            getItems: (details) => {
+                if (!details) return 0;
+                // Randomized = protected
+                if (details.randomized) return 0;
+                // Unique canvas fingerprint = 1 item
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Unique canvas fingerprint'
+        },
+        
+        webgl: {
+            getItems: (details) => {
+                if (!details) return 0;
+                if (details.randomized || details.spoofed) return 0;
+                // GPU info exposed = 1 item
+                return 1;
+            },
+            maxItems: 1,
+            description: 'GPU and graphics driver info'
+        },
+        
+        javascript: {
+            getItems: (details) => {
+                if (!details) return 0;
+                let items = 0;
+                if (details.userAgent) items += 1; // User agent
+                if (details.platform) items += 1; // Platform
+                if (details.hardwareConcurrency && !details.hardwareConcurrencyRandomized) items += 1; // CPU cores
+                if (details.deviceMemory && details.deviceMemory !== 'Unknown') items += 1; // Memory
+                return items;
+            },
+            maxItems: 4,
+            description: 'Browser and system information'
+        },
+        
+        screen: {
+            getItems: (details) => {
+                if (!details) return 0;
+                // Screen resolution is always exposed = 1 item
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Screen resolution and color depth'
+        },
+        
+        fonts: {
+            getItems: (details) => {
+                if (!details) return 0;
+                // Font list exposed = 1 item
+                return details.count > 0 ? 1 : 0;
+            },
+            maxItems: 1,
+            description: 'Installed fonts list'
+        },
+        
+        audio: {
+            getItems: (details) => {
+                if (!details) return 0;
+                if (details.randomized || details.blocked) return 0;
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Audio processing fingerprint'
+        },
+        
+        geolocation: {
+            getItems: (details) => {
+                if (!details) return 0;
+                // Only counts if permission granted
+                if (details.permissionState === 'granted') return 1;
                 return 0;
             },
-            description: 'Your IP address is highly identifying',
-            leakImpact: 'high'
+            maxItems: 1,
+            description: 'Precise GPS location'
         },
         
-        // WebRTC - Can leak local IPs even through VPN
-        webrtc: {
-            baseBits: (details) => {
-                if (details?.leaking === false) return 0;
-                return details?.localIPs?.length > 0 ? 8 : 0;
-            },
-            description: 'WebRTC can reveal local network information',
-            leakImpact: 'high'
-        },
-        
-        // Canvas - ~10 bits when unique, ~1.27 bits when randomized (EFF value)
-        canvas: {
-            baseBits: (details) => details?.randomized ? 1.27 : 10,
-            description: 'Canvas rendering varies by hardware/software',
-            leakImpact: 'high'
-        },
-        
-        // WebGL - ~7.2 bits for renderer info, ~1.44 bits when randomized (EFF value)
-        webgl: {
-            baseBits: (details) => (details?.randomized || details?.spoofed) ? 1.44 : 7.2,
-            description: 'GPU and driver information is identifying',
-            leakImpact: 'medium'
-        },
-        
-        // Browser Info - User agent ~3.5 bits, platform ~1.5 bits
-        javascript: {
-            baseBits: (details) => {
-                let bits = 3.5; // User agent
-                bits += 1.5; // Platform
-                if (details?.hardwareConcurrencyRandomized) {
-                    bits += 2.2; // Randomized HW concurrency still adds some
-                } else {
-                    bits += 2.1; // Normal HW concurrency
-                }
-                return bits;
-            },
-            description: 'Browser and OS details narrow down users',
-            leakImpact: 'medium'
-        },
-        
-        // Screen - ~6 bits based on EFF data
-        screen: {
-            baseBits: 6.2,
-            description: 'Screen resolution helps identify device type',
-            leakImpact: 'medium'
-        },
-        
-        // Fonts - Variable based on count, EFF shows ~9.44 bits for 32 fonts
-        // This is roughly log2(692) ≈ 9.44 for 32 fonts (1 in 692.8 browsers)
-        fonts: {
-            baseBits: (details) => {
-                const count = details?.count || 0;
-                // EFF methodology: ~0.29 bits per font on average
-                return Math.min(count * 0.29, 10);
-            },
-            description: 'Installed fonts vary significantly between systems',
-            leakImpact: 'high'
-        },
-        
-        // Audio - ~2.15 bits when unique, ~1.62 bits when randomized (EFF value)
-        audio: {
-            baseBits: (details) => details?.randomized ? 1.62 : 2.15,
-            description: 'Audio processing varies by hardware',
-            leakImpact: 'low'
-        },
-        
-        // Geolocation - Only counts if permission granted
-        geolocation: {
-            baseBits: (details) => details?.permissionState === 'granted' ? 15 : 0,
-            description: 'Precise location is highly identifying',
-            leakImpact: 'high'
-        },
-        
-        // Timezone - ~6.5 bits based on EFF data
         timezone: {
-            baseBits: 6.5,
-            description: 'Timezone narrows location to a region',
-            leakImpact: 'medium'
+            getItems: (details) => {
+                // Timezone is always visible = 1 item
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Timezone and locale'
         },
         
-        // DNT - ~1.7 bits when enabled (makes you more unique)
         dnt: {
-            baseBits: (details) => details?.dntEnabled ? 1.7 : 0,
-            description: 'DNT header ironically makes you more unique',
-            leakImpact: 'low'
+            getItems: (details) => {
+                // DNT enabled actually helps privacy, but it's info that's sent
+                // We count it as 0 items since it's privacy-positive
+                return 0;
+            },
+            maxItems: 0,
+            description: 'Do Not Track signal'
         },
         
-        // Battery - ~0.5 bits when available
         battery: {
-            baseBits: (details) => details?.supported && !details?.blocked ? 0.5 : 0,
-            description: 'Battery level can correlate browsing sessions',
-            leakImpact: 'low'
+            getItems: (details) => {
+                if (!details) return 0;
+                if (!details.supported || details.blocked) return 0;
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Battery status'
         },
         
-        // Network - ~0.3 bits when available
         network: {
-            baseBits: (details) => details?.supported ? 0.3 : 0,
-            description: 'Connection type helps identify device',
-            leakImpact: 'low'
+            getItems: (details) => {
+                if (!details) return 0;
+                if (!details.supported) return 0;
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Network connection type'
         },
         
-        // Client Hints - ~2 bits when available
         clientHints: {
-            baseBits: (details) => details?.supported ? 2 : 0,
-            description: 'Client hints provide detailed browser info',
-            leakImpact: 'medium'
+            getItems: (details) => {
+                if (!details) return 0;
+                if (!details.supported) return 0;
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Client hints headers'
         },
         
-        // Storage - ~0.3 bits (supercookie test)
         storage: {
-            baseBits: 0.26,
-            description: 'Storage APIs enable persistent tracking',
-            leakImpact: 'low'
+            getItems: (details) => {
+                // Storage APIs enable tracking = 1 item
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Storage and cookies'
         },
         
-        // Media Devices - ~1 bit
         media: {
-            baseBits: (details) => details?.supported && !details?.blocked ? 1 : 0,
-            description: 'Device configuration is identifying',
-            leakImpact: 'low'
+            getItems: (details) => {
+                if (!details) return 0;
+                if (!details.supported || details.blocked) return 0;
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Media devices count'
         },
         
-        // Touch Support - ~0.9 bits
         touch: {
-            baseBits: 0.92,
-            description: 'Touch support reveals device type',
-            leakImpact: 'low'
+            getItems: (details) => {
+                // Touch support is always visible = 1 item
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Touch support'
         },
         
-        // Ad Blocker - ~0 bits (very common)
         adBlocker: {
-            baseBits: 0,
-            description: 'Ad blocker usage is common',
-            leakImpact: 'low'
+            getItems: (details) => {
+                // Ad blocker detection = 1 item of info
+                return 1;
+            },
+            maxItems: 1,
+            description: 'Ad blocker detection'
         },
         
-        // HTTP Headers - ~2.7 bits for accept headers
         httpHeaders: {
-            baseBits: 2.74,
-            description: 'HTTP headers reveal browser preferences',
-            leakImpact: 'low'
+            getItems: (details) => {
+                // HTTP headers always sent = 1 item
+                return 1;
+            },
+            maxItems: 1,
+            description: 'HTTP header preferences'
         }
     };
     
-    let totalBits = 0;
-    let fingerprintBits = 0; // Comparable to EFF (excludes server-side data like IP)
+    let totalItems = 0;
+    let maxPossibleItems = 0;
+    let protectedItems = 0;
     const breakdown = {};
     
     Object.entries(results).forEach(([key, result]) => {
-        if (!entropyMap[key]) return;
+        if (!itemsMap[key]) return;
         
-        const config = entropyMap[key];
-        let bits = 0;
-        
-        // Only count bits if the test shows a leak or warning
-        // For 'safe' status, it means the browser is protected
-        if (result.status === 'leak' || result.status === 'warning') {
-            if (typeof config.baseBits === 'function') {
-                bits = config.baseBits(result.details);
-            } else {
-                bits = config.baseBits;
-            }
-        } else if (result.status === 'safe' && result.details?.randomized) {
-            // Even randomized values add some bits (reduced)
-            if (typeof config.baseBits === 'function') {
-                bits = Math.max(config.baseBits(result.details) * 0.15, 0); // 15% of original
-            }
-        }
+        const config = itemsMap[key];
+        const items = config.getItems(result.details);
         
         breakdown[key] = {
-            bits: Math.round(bits * 100) / 100,
-            description: config.description,
-            impact: config.leakImpact,
-            protected: result.status === 'safe'
+            items: items,
+            maxItems: config.maxItems,
+            protected: items === 0 && config.maxItems > 0,
+            description: config.description
         };
         
-        totalBits += bits;
-        
-        // Fingerprint bits excludes IP (server-side data) for EFF comparison
-        if (key !== 'ip') {
-            fingerprintBits += bits;
+        totalItems += items;
+        maxPossibleItems += config.maxItems;
+        if (items === 0 && config.maxItems > 0) {
+            protectedItems += config.maxItems;
         }
     });
     
+    // Calculate privacy score (0-100, higher is better)
+    const privacyScore = maxPossibleItems > 0 
+        ? Math.round(((maxPossibleItems - totalItems) / maxPossibleItems) * 100)
+        : 100;
+    
     return {
-        totalBits: Math.round(totalBits * 100) / 100,
-        fingerprintBits: Math.round(fingerprintBits * 100) / 100, // EFF-comparable
+        totalItems,
+        maxPossibleItems,
+        protectedItems,
+        privacyScore,
         breakdown,
-        uniqueness: getUniquenessLevel(fingerprintBits), // Use fingerprint bits for level
-        usersWithSameFingerprint: estimateMatchingUsers(fingerprintBits)
+        assessment: getAssessment(totalItems, privacyScore),
+        trackability: getTrackability(totalItems)
     };
 };
 
-const getUniquenessLevel = (bits) => {
-    if (bits >= 33) return { level: 'unique', label: 'Highly Identifiable', description: 'Your browser can be uniquely identified' };
-    if (bits >= 20) return { level: 'rare', label: 'Easily Identifiable', description: 'Very few browsers share your fingerprint' };
-    if (bits >= 15) return { level: 'uncommon', label: 'Somewhat Identifiable', description: 'Your fingerprint is fairly uncommon' };
-    if (bits >= 10) return { level: 'common', label: 'Less Identifiable', description: 'Many browsers share similar fingerprints' };
-    return { level: 'anonymous', label: 'Hard to Identify', description: 'Your browser blends in well with others' };
-};
-
-const estimateMatchingUsers = (bits) => {
-    // Based on ~5 billion internet users and 2^bits uniqueness
-    // We want to express this as "1 in X browsers" in simple terms
-    const uniqueFingerprints = Math.pow(2, Math.min(bits, 50)); // Cap at 2^50 for display
-    
-    // Format large numbers in a readable way
-    const formatNumber = (num) => {
-        if (num >= 1000000000000000) return 'quadrillions';
-        if (num >= 1000000000000) return `${(num / 1000000000000).toFixed(0)} trillion`;
-        if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)} billion`;
-        if (num >= 1000000) return `${(num / 1000000).toFixed(1)} million`;
-        if (num >= 1000) return `${(num / 1000).toFixed(0)} thousand`;
-        return num.toFixed(0);
-    };
-    
-    // For very high entropy (like 80 bits), just say unique
-    if (bits >= 50) {
+const getAssessment = (items, score) => {
+    if (score >= 80) {
         return {
-            ratio: Infinity,
-            text: 'essentially unique worldwide',
-            simple: 'Your browser is essentially unique - easily trackable',
-            isGood: false
+            level: 'good',
+            label: 'Well Protected',
+            description: 'Your browser reveals minimal identifying information'
         };
     }
-    
-    if (bits >= 33) {
+    if (score >= 60) {
         return {
-            ratio: uniqueFingerprints,
-            text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
-            simple: 'Your browser is essentially unique - easily trackable',
-            isGood: false
+            level: 'moderate',
+            label: 'Moderately Protected',
+            description: 'Some identifying information is exposed'
         };
     }
-    
-    if (bits >= 20) {
+    if (score >= 40) {
         return {
-            ratio: uniqueFingerprints,
-            text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
-            simple: 'Very few browsers look like yours - easy to track',
-            isGood: false
+            level: 'poor',
+            label: 'Poorly Protected',
+            description: 'Significant identifying information is exposed'
         };
     }
-    
-    if (bits >= 15) {
-        return {
-            ratio: uniqueFingerprints,
-            text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
-            simple: 'Your browser stands out from most - trackable',
-            isGood: false
-        };
-    }
-    
-    if (bits >= 10) {
-        // Around 1000 matching browsers
-        return {
-            ratio: uniqueFingerprints,
-            text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
-            simple: 'Your browser looks like thousands of others - harder to track',
-            isGood: true
-        };
-    }
-    
-    // Less than 10 bits - very common
     return {
-        ratio: uniqueFingerprints,
-        text: `1 in ${formatNumber(uniqueFingerprints)} browsers`,
-        simple: 'Your browser looks like millions of others - very hard to track',
-        isGood: true
+        level: 'bad',
+        label: 'Not Protected',
+        description: 'Most identifying information is exposed'
+    };
+};
+
+const getTrackability = (items) => {
+    // Simple explanation of how trackable you are
+    if (items <= 3) {
+        return {
+            level: 'low',
+            message: 'Hard to track - you blend in with many other users',
+            detail: `Only ${items} identifying items exposed`
+        };
+    }
+    if (items <= 8) {
+        return {
+            level: 'medium',
+            message: 'Moderately trackable - some unique characteristics visible',
+            detail: `${items} identifying items exposed`
+        };
+    }
+    if (items <= 15) {
+        return {
+            level: 'high',
+            message: 'Easily trackable - many unique characteristics visible',
+            detail: `${items} identifying items exposed`
+        };
+    }
+    return {
+        level: 'very-high',
+        message: 'Very easily trackable - your browser has many unique identifiers',
+        detail: `${items} identifying items exposed`
     };
 };
 
 // Protection recommendations based on results
-export const getRecommendations = (results, entropy) => {
+export const getRecommendations = (results, privacyData) => {
     const recommendations = [];
     
-    // High priority recommendations
+    // Check IP
+    if (results.ip?.status === 'leak') {
+        recommendations.push({
+            priority: 'high',
+            title: 'Use a VPN',
+            description: 'Your real IP address is exposed. A VPN will hide your IP and location from websites.',
+            link: 'https://www.privacyguides.org/en/vpn/'
+        });
+    }
+    
+    // Check WebRTC
     if (results.webrtc?.status === 'leak' && results.webrtc?.details?.localIPs?.length > 0) {
         recommendations.push({
             priority: 'high',
             title: 'Disable WebRTC',
-            description: 'WebRTC is leaking your local IP addresses. Use a browser extension like WebRTC Leak Shield or disable WebRTC in browser settings.',
+            description: 'WebRTC is leaking your local IP addresses, even if you use a VPN. Disable it in browser settings.',
             link: 'https://browserleaks.com/webrtc#howto-disable-webrtc'
         });
     }
     
+    // Check Canvas
     if (results.canvas?.status === 'leak') {
         recommendations.push({
             priority: 'high',
-            title: 'Use Canvas Fingerprint Protection',
-            description: 'Consider using Brave browser or a canvas blocker extension. These can randomize canvas fingerprints.',
+            title: 'Use Canvas Protection',
+            description: 'Your canvas fingerprint is unique. Use Brave browser or a canvas blocker extension.',
             link: 'https://brave.com/'
         });
     }
     
-    if (results.dnt?.details?.dntEnabled === false && results.dnt?.details?.gpcEnabled === false) {
+    // Check WebGL  
+    if (results.webgl?.status === 'leak') {
         recommendations.push({
             priority: 'medium',
-            title: 'Enable Global Privacy Control',
-            description: 'Enable GPC in your browser settings to signal tracking opt-out to websites.',
-            link: 'https://globalprivacycontrol.org/'
-        });
-    }
-    
-    if (results.storage?.status === 'leak') {
-        recommendations.push({
-            priority: 'medium',
-            title: 'Manage Storage and Cookies',
-            description: 'Consider using browser settings to block third-party cookies or use containers.',
+            title: 'Protect WebGL Info',
+            description: 'Your GPU information is exposed. Brave browser can protect against this.',
             link: null
         });
     }
     
-    // General recommendations based on entropy
-    if (entropy.totalBits > 25) {
+    // Check DNT/GPC
+    if (results.dnt?.details?.dntEnabled === false && results.dnt?.details?.gpcEnabled === false) {
         recommendations.push({
-            priority: 'high',
-            title: 'Consider a Privacy-Focused Browser',
-            description: 'Browsers like Brave, Firefox with strict settings, or Tor Browser can significantly reduce fingerprinting.',
-            link: 'https://www.privacyguides.org/en/desktop-browsers/'
+            priority: 'medium',
+            title: 'Enable Privacy Signals',
+            description: 'Enable Do Not Track or Global Privacy Control in your browser settings.',
+            link: 'https://globalprivacycontrol.org/'
         });
     }
     
-    // Add VPN recommendation if IP is exposed
-    if (results.ip?.status === 'leak') {
+    // General recommendation based on score
+    if (privacyData.privacyScore < 50) {
         recommendations.push({
-            priority: 'medium',
-            title: 'Use a VPN or Tor',
-            description: 'A VPN can mask your real IP address. For maximum privacy, consider Tor Browser.',
-            link: 'https://www.privacyguides.org/en/vpn/'
+            priority: 'high',
+            title: 'Consider a Privacy Browser',
+            description: 'For better protection, consider Brave, Firefox with strict settings, or Tor Browser.',
+            link: 'https://www.privacyguides.org/en/desktop-browsers/'
         });
     }
     
@@ -358,99 +378,99 @@ export const getRecommendations = (results, entropy) => {
 export const getTestExplanation = (testId) => {
     const explanations = {
         ip: {
-            what: "Your IP address is like your home address on the internet. Every website you visit can see it.",
-            risk: "Websites can determine your approximate location, ISP, and potentially identify you across sessions.",
-            protect: "Use a VPN or Tor to mask your real IP address."
+            what: "Your IP address is your unique identifier on the internet.",
+            risk: "Reveals your location, ISP, and can be used to identify you across sessions.",
+            protect: "Use a VPN or Tor to hide your real IP address."
         },
         webrtc: {
-            what: "WebRTC is a technology for real-time communication in browsers (video calls, etc.).",
-            risk: "Even with a VPN, WebRTC can leak your real local and public IP addresses.",
-            protect: "Disable WebRTC in browser settings or use an extension to block it."
+            what: "WebRTC enables real-time communication (video calls) in browsers.",
+            risk: "Can leak your real IP address even when using a VPN.",
+            protect: "Disable WebRTC in browser settings or use an extension."
         },
         canvas: {
-            what: "Canvas fingerprinting draws invisible graphics to identify your unique rendering.",
-            risk: "The way your browser renders graphics is unique to your hardware/software combination.",
-            protect: "Use Brave browser or canvas-blocking extensions to randomize this fingerprint."
+            what: "Canvas fingerprinting creates a unique image based on your system.",
+            risk: "Your browser's rendering is unique and can identify you.",
+            protect: "Use Brave browser or canvas blocking extensions."
         },
         webgl: {
-            what: "WebGL provides information about your graphics card and driver.",
-            risk: "Your GPU model and driver version create a relatively unique identifier.",
-            protect: "Some browsers like Brave can spoof WebGL information."
+            what: "WebGL exposes your graphics card information.",
+            risk: "GPU details help create a unique fingerprint of your device.",
+            protect: "Brave browser can protect WebGL information."
         },
         javascript: {
-            what: "JavaScript can access many details about your browser and system.",
-            risk: "User agent, platform, plugins, and more create a detailed profile.",
-            protect: "Use browser extensions to spoof or block some of this information."
+            what: "JavaScript reveals browser and system details.",
+            risk: "User agent, platform, and hardware info help identify your device.",
+            protect: "Some browsers can spoof or limit this information."
         },
         screen: {
-            what: "Your screen resolution and display settings are visible to websites.",
-            risk: "Unusual screen sizes or configurations can help identify your device.",
+            what: "Your screen resolution is visible to websites.",
+            risk: "Unusual resolutions make you more identifiable.",
             protect: "Using common resolutions reduces uniqueness."
         },
         fonts: {
-            what: "Websites can detect which fonts are installed on your system.",
-            risk: "Your font collection is often unique, especially with custom fonts installed.",
-            protect: "Firefox and some extensions can limit font enumeration."
+            what: "Websites can detect which fonts you have installed.",
+            risk: "Your font collection is often unique to your system.",
+            protect: "Firefox can limit font enumeration."
         },
         audio: {
-            what: "Audio processing characteristics vary between devices.",
-            risk: "The way your device processes audio creates a fingerprint.",
-            protect: "Brave browser provides audio fingerprint protection."
+            what: "Audio fingerprinting measures how your device processes sound.",
+            risk: "Audio characteristics vary by hardware and create a fingerprint.",
+            protect: "Brave browser protects against audio fingerprinting."
         },
         geolocation: {
-            what: "The Geolocation API can request your precise GPS coordinates.",
+            what: "Geolocation API can request your precise GPS coordinates.",
             risk: "If granted, websites know your exact physical location.",
             protect: "Deny location requests unless absolutely necessary."
         },
         timezone: {
             what: "Your system timezone is visible to websites.",
-            risk: "Timezone reveals your general geographic region and adds ~6 bits of identifying information.",
+            risk: "Reveals your general geographic region.",
             protect: "Tor Browser normalizes timezone to UTC."
         },
         dnt: {
-            what: "Do Not Track is a browser setting requesting sites not to track you.",
-            risk: "Ironically, enabling DNT can make you more unique since few users enable it.",
-            protect: "Consider using Global Privacy Control (GPC) instead or in addition."
+            what: "Do Not Track signals your preference not to be tracked.",
+            risk: "Most websites ignore this signal.",
+            protect: "Enable Global Privacy Control (GPC) for legal backing."
         },
         battery: {
-            what: "The Battery API exposes your device's charge level and status.",
-            risk: "Battery state can correlate browsing sessions and identify devices.",
+            what: "Battery API can reveal your device's charge status.",
+            risk: "Can be used to correlate browsing sessions.",
             protect: "Most modern browsers have restricted this API."
         },
         network: {
-            what: "Network information includes connection type and speed.",
-            risk: "Connection details help identify your network environment.",
-            protect: "Limited protection available; use VPN for network-level privacy."
+            what: "Network API reveals your connection type.",
+            risk: "Connection details help profile your device.",
+            protect: "Limited protection available."
         },
         clientHints: {
-            what: "Client Hints are a modern replacement for user-agent strings.",
-            risk: "They provide detailed browser and device information in a structured format.",
-            protect: "Some browsers allow limiting client hints headers."
+            what: "Client Hints provide detailed browser info to servers.",
+            risk: "Reveals browser version, platform, and device details.",
+            protect: "Some browsers allow limiting client hints."
         },
         storage: {
-            what: "Storage APIs (localStorage, cookies, IndexedDB) allow persistent data.",
-            risk: "Trackers use storage to maintain identifiers across sessions.",
-            protect: "Clear storage regularly or use containers/private browsing."
+            what: "Storage APIs allow websites to save data in your browser.",
+            risk: "Enables persistent tracking across sessions.",
+            protect: "Clear cookies and storage regularly."
         },
         media: {
-            what: "Websites can enumerate your cameras and microphones.",
-            risk: "Device count and types contribute to fingerprinting.",
+            what: "Websites can count your cameras and microphones.",
+            risk: "Device configuration helps identify your system.",
             protect: "Deny media access when not needed."
         },
         touch: {
-            what: "Touch support indicates whether your device has a touchscreen.",
-            risk: "This helps trackers determine your device type (mobile, tablet, desktop).",
-            protect: "Limited protection available - this is tied to your hardware."
+            what: "Touch support indicates your device type.",
+            risk: "Helps determine if you're on mobile, tablet, or desktop.",
+            protect: "This is tied to your hardware."
         },
         adBlocker: {
-            what: "Websites can detect if you're using an ad blocker.",
-            risk: "While ad blockers improve privacy, their detection adds to your fingerprint.",
-            protect: "Keep using an ad blocker - the privacy benefits outweigh fingerprinting concerns."
+            what: "Websites can detect if you use an ad blocker.",
+            risk: "Ad blocker usage adds to your fingerprint.",
+            protect: "Keep using it - privacy benefits outweigh fingerprinting."
         },
         httpHeaders: {
-            what: "HTTP headers are sent with every request, revealing browser preferences.",
-            risk: "Language, encoding preferences, and other headers help identify you.",
-            protect: "Browser language is hard to spoof without breaking usability."
+            what: "HTTP headers are sent with every request.",
+            risk: "Language, encoding preferences reveal browser details.",
+            protect: "Hard to change without breaking functionality."
         }
     };
     
@@ -460,3 +480,6 @@ export const getTestExplanation = (testId) => {
         protect: "Consider using a privacy-focused browser."
     };
 };
+
+// Keep old function name for compatibility
+export const calculateEntropy = calculatePrivacyScore;
