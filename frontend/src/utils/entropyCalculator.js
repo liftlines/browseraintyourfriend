@@ -4,9 +4,13 @@
 
 export const calculateEntropy = (results) => {
     const entropyMap = {
-        // IP Address - ~18 bits based on global IP space usage
+        // IP Address - ~18 bits when exposed, reduced when VPN detected
         ip: {
-            baseBits: (details) => details?.exposed ? 18 : 0,
+            baseBits: (details) => {
+                if (details?.vpnDetected) return 8; // VPN still reveals some info (VPN provider, exit node region)
+                if (details?.exposed) return 18;
+                return 0;
+            },
             description: 'Your IP address is highly identifying',
             leakImpact: 'high'
         },
