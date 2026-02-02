@@ -59,7 +59,7 @@ const HomePage = () => {
             
             if (newStats.leak > newStats.safe) {
                 toast.error(`${newStats.leak} privacy leaks detected`, {
-                    description: `Your browser fingerprint has ${entropyData.totalBits.toFixed(0)} bits of entropy`
+                    description: `${entropyData.totalItems} identifying items exposed`
                 });
             } else if (newStats.leak > 0) {
                 toast.warning(`${newStats.leak} potential exposures found`, {
@@ -89,13 +89,13 @@ const HomePage = () => {
         <div className="min-h-screen bg-background">
             <Header onRefresh={runScan} isScanning={isScanning} />
             <main>
-                <Hero stats={stats} isScanning={isScanning} entropy={entropy} />
+                <Hero stats={stats} isScanning={isScanning} privacyData={entropy} />
                 
                 {/* Uniqueness Card - Shows after scanning */}
                 {!isScanning && entropy && (
                     <section className="px-4 sm:px-6 lg:px-8 pb-8">
                         <div className="max-w-6xl mx-auto">
-                            <UniquenessCard entropy={entropy} />
+                            <UniquenessCard privacyData={entropy} />
                         </div>
                     </section>
                 )}
