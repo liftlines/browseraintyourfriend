@@ -204,7 +204,17 @@ export const testWebRTC = () => {
             
             if (ipMatch) {
                 const ip = ipMatch[0];
-                if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+                // Check for private IP ranges (RFC 1918)
+                // 10.0.0.0 - 10.255.255.255
+                // 172.16.0.0 - 172.31.255.255
+                // 192.168.0.0 - 192.168.255.255
+                const isPrivate = ip.startsWith('192.168.') || 
+                                 ip.startsWith('10.') || 
+                                 (ip.startsWith('172.') && (() => {
+                                     const secondOctet = parseInt(ip.split('.')[1], 10);
+                                     return secondOctet >= 16 && secondOctet <= 31;
+                                 })());
+                if (isPrivate) {
                     if (!ips.local.includes(ip)) ips.local.push(ip);
                 } else {
                     if (!ips.public.includes(ip)) ips.public.push(ip);
