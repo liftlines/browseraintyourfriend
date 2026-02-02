@@ -235,9 +235,32 @@ export const testCanvas = async () => {
         // Check for Brave browser first
         const isBrave = navigator.brave && await navigator.brave.isBrave();
         
-        // Check for Firefox's resistFingerprinting
-        const isFirefoxResist = navigator.userAgent.includes('Firefox') && 
-            (window.CSS && CSS.supports('(-moz-appearance: none)'));
+        // Firefox resistFingerprinting detection - more accurate method
+        // When resistFingerprinting is enabled, canvas returns uniform noise
+        // We detect this by checking if the canvas produces a specific pattern
+        let isFirefoxResist = false;
+        if (navigator.userAgent.includes('Firefox')) {
+            // Create a test canvas to check for resistFingerprinting
+            const testCanvas = document.createElement('canvas');
+            testCanvas.width = 16;
+            testCanvas.height = 16;
+            const testCtx = testCanvas.getContext('2d');
+            testCtx.fillStyle = '#ff0000';
+            testCtx.fillRect(0, 0, 16, 16);
+            const testData = testCtx.getImageData(0, 0, 16, 16).data;
+            
+            // With resistFingerprinting, pixel values are randomized
+            // Check if all red pixels are NOT exactly 255 (which they should be normally)
+            let hasUnexpectedValues = false;
+            for (let i = 0; i < testData.length; i += 4) {
+                // Red channel should be 255 for #ff0000
+                if (testData[i] !== 255 || testData[i + 1] !== 0 || testData[i + 2] !== 0) {
+                    hasUnexpectedValues = true;
+                    break;
+                }
+            }
+            isFirefoxResist = hasUnexpectedValues;
+        }
         
         const canvas = document.createElement('canvas');
         canvas.width = 220;
