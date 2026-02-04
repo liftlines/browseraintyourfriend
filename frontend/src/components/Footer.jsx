@@ -36,9 +36,10 @@ const Footer = () => {
                 {/* Disclaimer */}
                 <div className="mt-8 pt-6 border-t border-border/50">
                     <p className="text-xs text-muted-foreground/50 font-sans text-center max-w-2xl mx-auto">
-                        This tool is for educational purposes only. The fingerprinting techniques 
-                        demonstrated here are used by websites to track users. Consider using 
-                        privacy-focused browsers or extensions to protect yourself.
+                        This tool is indicative in nature and for educational purposes only and inspired 
+                        by other similar open-source contributions. The fingerprinting techniques examined 
+                        here are generally used by websites to track users. Consider using privacy-focused 
+                        browsers or extensions to protect yourself.
                     </p>
                 </div>
             </div>
