@@ -13,7 +13,14 @@ const hashString = async (str) => {
 // 1. IP Address Detection - Enhanced with VPN/Proxy detection
 export const testIPAddress = async () => {
     try {
-        const response = await fetch('https://ipapi.co/json/');
+        // Add cache-busting to ensure fresh IP lookup on each scan
+        const cacheBuster = Date.now();
+        const response = await fetch(`https://ipapi.co/json/?_=${cacheBuster}`, {
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        });
         const data = await response.json();
         
         // VPN/Proxy Detection - Check multiple indicators
@@ -57,7 +64,10 @@ export const testIPAddress = async () => {
         };
     } catch (error) {
         try {
-            const response = await fetch('https://api.ipify.org?format=json');
+            const cacheBuster = Date.now();
+            const response = await fetch(`https://api.ipify.org?format=json&_=${cacheBuster}`, {
+                cache: 'no-store'
+            });
             const data = await response.json();
             return {
                 status: 'leak',
