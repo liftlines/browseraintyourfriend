@@ -48,41 +48,54 @@ const RecommendationsCard = ({ recommendations }) => {
             </CardHeader>
             
             <CardContent className="space-y-4">
-                {recommendations.map((rec, index) => (
-                    <div 
-                        key={index}
-                        className="p-4 bg-muted/20 rounded-lg border border-border/50 hover:border-border transition-colors"
-                    >
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Badge 
-                                        variant="outline" 
-                                        className={`${getPriorityColor(rec.priority)} text-xs`}
-                                    >
-                                        {getPriorityLabel(rec.priority)}
-                                    </Badge>
+                {hasRecommendations ? (
+                    <>
+                        {recommendations.map((rec, index) => (
+                            <div 
+                                key={index}
+                                className="p-4 bg-muted/20 rounded-lg border border-border/50 hover:border-border transition-colors"
+                            >
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Badge 
+                                                variant="outline" 
+                                                className={`${getPriorityColor(rec.priority)} text-xs`}
+                                            >
+                                                {getPriorityLabel(rec.priority)}
+                                            </Badge>
+                                        </div>
+                                        <h4 className="font-medium text-foreground text-sm mb-1">
+                                            {rec.title}
+                                        </h4>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            {rec.description}
+                                        </p>
+                                    </div>
+                                    {rec.link && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="shrink-0 text-muted-foreground hover:text-foreground"
+                                            onClick={() => window.open(rec.link, '_blank')}
+                                        >
+                                            <ExternalLink className="h-4 w-4" />
+                                        </Button>
+                                    )}
                                 </div>
-                                <h4 className="font-medium text-foreground text-sm mb-1">
-                                    {rec.title}
-                                </h4>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                    {rec.description}
-                                </p>
                             </div>
-                            {rec.link && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                                    onClick={() => window.open(rec.link, '_blank')}
-                                >
-                                    <ExternalLink className="h-4 w-4" />
-                                </Button>
-                            )}
-                        </div>
+                        ))}
+                    </>
+                ) : (
+                    <div className="p-4 bg-success/10 rounded-lg border border-success/30">
+                        <p className="text-success font-medium text-sm">
+                            Great job! Your browser is well-protected.
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            No urgent privacy recommendations at this time.
+                        </p>
                     </div>
-                ))}
+                )}
                 
                 {/* General Tips */}
                 <div className="mt-6 pt-4 border-t border-border">
