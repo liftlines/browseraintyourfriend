@@ -20,7 +20,15 @@ const Footer = () => {
                             All tests run locally in your browser. No data is sent to any server.
                         </p>
                         <p className="text-xs text-muted-foreground/60 font-sans flex items-center justify-center md:justify-end gap-1">
-                            Made with <Heart className="h-3 w-3 text-destructive" /> for privacy awareness
+                            Made with <Heart className="h-3 w-3 text-destructive" /> for privacy awareness by{' '}
+                            <a 
+                                href="https://x.com/liftlines" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                @liftlines
+                            </a>
                         </p>
                     </div>
                 </div>
