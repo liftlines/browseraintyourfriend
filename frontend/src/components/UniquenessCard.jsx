@@ -40,12 +40,6 @@ const UniquenessCard = ({ privacyData }) => {
         }
     };
     
-    // Get top exposed items for display
-    const exposedItems = Object.entries(breakdown)
-        .filter(([_, data]) => data.items > 0)
-        .sort((a, b) => b[1].items - a[1].items)
-        .slice(0, 5);
-    
     return (
         <Card className="leak-card mb-8">
             <CardHeader className="pb-4">
