@@ -2,8 +2,14 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Shield, ExternalLink, ChevronRight, Rocket } from 'lucide-react';
+import { trackCtaClick } from '@/App';
 
 const RecommendationsCard = () => {
+    const handleCtaClick = () => {
+        trackCtaClick();
+        window.open('https://logos.co', '_blank');
+    };
+    
     return (
         <Card className="leak-card mb-8">
             <CardHeader className="pb-4">
