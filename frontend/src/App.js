@@ -3,11 +3,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
 import ResultsGrid from '@/components/ResultsGrid';
-import UniquenessCard from '@/components/UniquenessCard';
 import RecommendationsCard from '@/components/RecommendationsCard';
 import Footer from '@/components/Footer';
 import { runAllTests } from '@/utils/privacyTests';
-import { calculateEntropy } from '@/utils/entropyCalculator';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 
@@ -15,7 +13,6 @@ const HomePage = () => {
     const [results, setResults] = useState(null);
     const [isScanning, setIsScanning] = useState(true);
     const [stats, setStats] = useState(null);
-    const [entropy, setEntropy] = useState(null);
     
     const calculateStats = useCallback((results) => {
         if (!results) return null;
