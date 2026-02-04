@@ -7,7 +7,9 @@ export const calculatePrivacyScore = (results) => {
         ip: {
             getItems: (details) => {
                 if (!details) return 0;
-                if (details.vpnDetected) return 0;
+                // Check all protection types: VPN, Proxy, Tor, or Datacenter
+                if (details.vpnDetected || details.proxyDetected || 
+                    details.torDetected || details.datacenterDetected) return 0;
                 return 3; // IP, location, ISP
             },
             maxItems: 3,
