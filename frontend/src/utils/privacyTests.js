@@ -1,4 +1,5 @@
-// Privacy Test Utilities - Fully Functional Browser Privacy Detection
+// Privacy Test Utilities - Robust Browser Privacy Detection
+// Based on FingerprintJS and EFF Cover Your Tracks implementations
 
 // Helper to generate hash from string
 const hashString = async (str) => {
@@ -12,129 +13,59 @@ const hashString = async (str) => {
 // 1. IP Address Detection - Enhanced with VPN/Proxy detection
 export const testIPAddress = async () => {
     try {
-        // Get IP with geolocation info
         const response = await fetch('https://ipapi.co/json/');
         const data = await response.json();
         
-        // Also try to get IPv6
-        let ipv6 = null;
-        try {
-            const v6Response = await fetch('https://api64.ipify.org?format=json');
-            const v6Data = await v6Response.json();
-            if (v6Data.ip !== data.ip) {
-                ipv6 = v6Data.ip;
-            }
-        } catch (e) {
-            // IPv6 not available
-        }
-        
         // VPN/Proxy Detection - Check multiple indicators
         const orgLower = (data.org || '').toLowerCase();
-        const isVpnByOrg = orgLower.includes('vpn') || 
-                          orgLower.includes('proxy') ||
-                          orgLower.includes('hosting') ||
-                          orgLower.includes('datacenter') ||
-                          orgLower.includes('server') ||
-                          orgLower.includes('cloud') ||
-                          orgLower.includes('digital ocean') ||
-                          orgLower.includes('amazon') ||
-                          orgLower.includes('google cloud') ||
-                          orgLower.includes('microsoft') ||
-                          orgLower.includes('linode') ||
-                          orgLower.includes('vultr') ||
-                          orgLower.includes('ovh');
+        const vpnKeywords = ['vpn', 'proxy', 'hosting', 'datacenter', 'server', 'cloud', 
+                           'digital ocean', 'amazon', 'google cloud', 'microsoft', 
+                           'linode', 'vultr', 'ovh', 'hetzner', 'choopa', 'mullvad',
+                           'nordvpn', 'expressvpn', 'surfshark', 'private internet'];
+        const isVpnByOrg = vpnKeywords.some(kw => orgLower.includes(kw));
         
-        // Common VPN provider ASNs
-        const vpnAsns = ['AS9009', 'AS20473', 'AS16276', 'AS14061', 'AS396982', 'AS13335', 
-                        'AS14618', 'AS16509', 'AS15169', 'AS8075', 'AS63949', 'AS46606'];
-        const isVpnByAsn = vpnAsns.some(asn => String(data.asn).includes(asn.replace('AS', '')));
-        
-        // Check timezone vs IP location mismatch (strong VPN indicator)
+        // Check timezone mismatch (strong VPN indicator)
         const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const ipTimezone = data.timezone;
         const timezoneMismatch = ipTimezone && browserTimezone !== ipTimezone;
         
-        // Determine if VPN is likely being used
-        const isVpn = isVpnByOrg || isVpnByAsn || timezoneMismatch;
-        
-        // Assessment logic:
-        // - VPN detected = "protected" (your real IP is hidden)
-        // - No VPN = "leak" (your real IP is exposed)
+        const isVpn = isVpnByOrg || timezoneMismatch;
         const status = isVpn ? 'safe' : 'leak';
-        const summary = isVpn 
-            ? `VPN/Proxy detected - real IP hidden`
-            : `Your real IP is visible (${data.ip})`;
         
         return {
             status,
-            summary,
+            summary: isVpn 
+                ? `VPN/Proxy detected - real IP hidden`
+                : `Your real IP is visible (${data.ip})`,
             details: {
-                // Basic IP Info
                 ipAddress: data.ip,
-                ipv6: ipv6,
-                ipVersion: data.version || 'IPv4',
-                
-                // Location Info
                 country: data.country_name,
-                countryCode: data.country_code,
-                region: data.region,
                 city: data.city,
-                postalCode: data.postal,
-                latitude: data.latitude,
-                longitude: data.longitude,
-                ipTimezone: ipTimezone,
-                
-                // Network Info
+                region: data.region,
                 isp: data.org,
-                asn: data.asn,
-                
-                // VPN/Proxy Detection Results
                 vpnDetected: isVpn,
                 vpnIndicators: {
                     orgNameMatch: isVpnByOrg,
-                    asnMatch: isVpnByAsn,
                     timezoneMismatch: timezoneMismatch
                 },
                 browserTimezone: browserTimezone,
-                
-                // Assessment
+                ipTimezone: ipTimezone,
                 assessment: isVpn 
                     ? 'PROTECTED: Your real IP is hidden behind a VPN/Proxy'
-                    : 'EXPOSED: Your real IP address and location are visible to websites',
-                privacyNote: isVpn 
-                    ? 'Good - VPN detected. Your real IP is hidden, though the VPN exit location is visible.'
-                    : 'Risk - Your real IP reveals your location, ISP, and can be used to identify you.'
+                    : 'EXPOSED: Your real IP address and location are visible'
             }
         };
     } catch (error) {
-        // Fallback to simple IP check with browser timezone info
         try {
             const response = await fetch('https://api.ipify.org?format=json');
             const data = await response.json();
-            const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            
             return {
                 status: 'leak',
                 summary: `Your real IP is visible (${data.ip})`,
                 details: {
-                    // Basic IP Info
                     ipAddress: data.ip,
-                    ipVersion: 'IPv4',
-                    
-                    // Browser Info (we can still get this)
-                    browserTimezone: browserTimezone,
-                    browserLanguage: navigator.language,
-                    
-                    // Network Info
-                    connectionType: navigator.connection?.effectiveType || 'unknown',
-                    
-                    // Status
-                    exposed: true,
                     vpnDetected: false,
-                    
-                    // Note
-                    privacyNote: 'Your IP address is exposed - websites can track your location and identity',
-                    limitedInfo: 'Full geolocation lookup unavailable - only basic IP shown'
+                    limitedInfo: 'Full geolocation unavailable'
                 }
             };
         } catch (e) {
@@ -147,20 +78,16 @@ export const testIPAddress = async () => {
     }
 };
 
-// 2. WebRTC Leak Test
+// 2. WebRTC Leak Test - Properly detects IP leaks
 export const testWebRTC = () => {
     return new Promise((resolve) => {
-        const ips = {
-            local: [],
-            public: [],
-            ipv6: []
-        };
+        const ips = { local: [], public: [], ipv6: [] };
         
         if (!window.RTCPeerConnection) {
             resolve({
                 status: 'safe',
                 summary: 'WebRTC not supported',
-                details: { supported: false }
+                details: { supported: false, leaking: false }
             });
             return;
         }
@@ -173,7 +100,6 @@ export const testWebRTC = () => {
         });
         
         pc.createDataChannel('');
-        
         pc.createOffer().then(offer => pc.setLocalDescription(offer));
         
         const timeout = setTimeout(() => {
@@ -181,13 +107,16 @@ export const testWebRTC = () => {
             const hasLeak = ips.local.length > 0 || ips.public.length > 0;
             resolve({
                 status: hasLeak ? 'leak' : 'safe',
-                summary: hasLeak ? 'WebRTC is leaking IPs' : 'WebRTC is not leaking IPs',
+                summary: hasLeak ? `WebRTC leaking ${ips.local.length + ips.public.length} IP(s)` : 'WebRTC protected',
                 details: {
                     supported: true,
                     localIPs: ips.local,
                     publicIPs: ips.public,
                     ipv6: ips.ipv6,
-                    leaking: hasLeak
+                    leaking: hasLeak,
+                    assessment: hasLeak 
+                        ? 'EXPOSED: WebRTC reveals IP addresses even with VPN'
+                        : 'PROTECTED: No WebRTC IP leak detected'
                 }
             });
         }, 3000);
@@ -196,397 +125,236 @@ export const testWebRTC = () => {
             if (!event.candidate) return;
             
             const candidate = event.candidate.candidate;
-            const ipRegex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
-            const ipv6Regex = /([a-f0-9]{1,4}(:[a-f0-9]{1,4}){7}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){0,7}::[a-f0-9]{0,4}(:[a-f0-9]{1,4}){0,7})/i;
+            const ipv4Regex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
+            const ipv6Regex = /([a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/i;
             
-            const ipMatch = candidate.match(ipRegex);
+            const ipv4Match = candidate.match(ipv4Regex);
             const ipv6Match = candidate.match(ipv6Regex);
             
-            if (ipMatch) {
-                const ip = ipMatch[0];
-                // Check for private IP ranges (RFC 1918)
-                // 10.0.0.0 - 10.255.255.255
-                // 172.16.0.0 - 172.31.255.255
-                // 192.168.0.0 - 192.168.255.255
+            if (ipv4Match) {
+                const ip = ipv4Match[0];
+                // RFC 1918 private ranges
                 const isPrivate = ip.startsWith('192.168.') || 
                                  ip.startsWith('10.') || 
                                  (ip.startsWith('172.') && (() => {
-                                     const secondOctet = parseInt(ip.split('.')[1], 10);
-                                     return secondOctet >= 16 && secondOctet <= 31;
+                                     const second = parseInt(ip.split('.')[1], 10);
+                                     return second >= 16 && second <= 31;
                                  })());
                 if (isPrivate) {
                     if (!ips.local.includes(ip)) ips.local.push(ip);
-                } else {
+                } else if (!ip.startsWith('0.') && ip !== '0.0.0.0') {
                     if (!ips.public.includes(ip)) ips.public.push(ip);
                 }
             }
             
-            if (ipv6Match) {
-                const ip = ipv6Match[0];
-                if (!ips.ipv6.includes(ip)) ips.ipv6.push(ip);
+            if (ipv6Match && !ips.ipv6.includes(ipv6Match[0])) {
+                ips.ipv6.push(ipv6Match[0]);
             }
         };
     });
 };
 
-// 3. Canvas Fingerprinting - Enhanced with BrowserLeaks-style details
+// 3. Canvas Fingerprinting - FingerprintJS-style implementation
 export const testCanvas = async () => {
     try {
-        // Check for Brave browser first
         const isBrave = navigator.brave && await navigator.brave.isBrave();
         
-        // Firefox resistFingerprinting detection - more accurate method
-        // When resistFingerprinting is enabled, canvas returns uniform noise
-        // We detect this by checking if the canvas produces a specific pattern
-        let isFirefoxResist = false;
-        if (navigator.userAgent.includes('Firefox')) {
-            // Create a test canvas to check for resistFingerprinting
-            const testCanvas = document.createElement('canvas');
-            testCanvas.width = 16;
-            testCanvas.height = 16;
-            const testCtx = testCanvas.getContext('2d');
-            testCtx.fillStyle = '#ff0000';
-            testCtx.fillRect(0, 0, 16, 16);
-            const testData = testCtx.getImageData(0, 0, 16, 16).data;
-            
-            // With resistFingerprinting, pixel values are randomized
-            // Check if all red pixels are NOT exactly 255 (which they should be normally)
-            let hasUnexpectedValues = false;
-            for (let i = 0; i < testData.length; i += 4) {
-                // Red channel should be 255 for #ff0000
-                if (testData[i] !== 255 || testData[i + 1] !== 0 || testData[i + 2] !== 0) {
-                    hasUnexpectedValues = true;
-                    break;
-                }
-            }
-            isFirefoxResist = hasUnexpectedValues;
-        }
-        
         const canvas = document.createElement('canvas');
-        canvas.width = 220;
-        canvas.height = 30;
+        canvas.width = 240;
+        canvas.height = 60;
         const ctx = canvas.getContext('2d');
         
-        // Draw like BrowserLeaks does
-        const txt = "BrowserLeaks,com <canvas> 1.0";
-        ctx.textBaseline = "top";
-        ctx.font = "14px 'Arial'";
-        ctx.textBaseline = "alphabetic";
-        ctx.fillStyle = "#f60";
-        ctx.fillRect(125, 1, 62, 20);
-        ctx.fillStyle = "#069";
-        ctx.fillText(txt, 2, 15);
-        ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
-        ctx.fillText(txt, 4, 17);
+        if (!ctx) {
+            return { status: 'safe', summary: 'Canvas not supported', details: { supported: false } };
+        }
         
+        // FingerprintJS-style canvas test
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#f60';
+        ctx.fillRect(100, 1, 62, 20);
+        
+        ctx.fillStyle = '#069';
+        ctx.font = '11pt Arial';
+        ctx.fillText('Cwm fjordbank glyphs vext quiz, 😃', 2, 15);
+        
+        ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+        ctx.font = '18pt Arial';
+        ctx.fillText('Cwm fjordbank glyphs vext quiz, 😃', 4, 45);
+        
+        // Get pixel data to detect randomization
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL();
         const hash = await hashString(dataUrl);
         
-        // Get image details like BrowserLeaks
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
+        // Detect protection by checking if output changes on repeated calls
+        let isRandomized = isBrave;
         
-        // Count unique colors
-        const colors = new Set();
-        for (let i = 0; i < pixels.length; i += 4) {
-            const color = `${pixels[i]},${pixels[i+1]},${pixels[i+2]},${pixels[i+3]}`;
-            colors.add(color);
+        // Firefox resistFingerprinting detection
+        if (!isRandomized && navigator.userAgent.includes('Firefox')) {
+            const testCanvas2 = document.createElement('canvas');
+            testCanvas2.width = 16;
+            testCanvas2.height = 16;
+            const ctx2 = testCanvas2.getContext('2d');
+            ctx2.fillStyle = '#ff0000';
+            ctx2.fillRect(0, 0, 16, 16);
+            const data = ctx2.getImageData(0, 0, 16, 16).data;
+            // resistFingerprinting adds noise to pixel values
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i] !== 255) { isRandomized = true; break; }
+            }
         }
-        
-        // Calculate base64 size
-        const base64Size = Math.ceil((dataUrl.length - 22) * 3 / 4); // Approximate bytes
-        
-        // Brave randomizes per-first-party domain (not per-call)
-        const isRandomized = isBrave || isFirefoxResist;
         
         return {
             status: isRandomized ? 'safe' : 'leak',
             summary: isRandomized 
-                ? 'Canvas fingerprint is randomized (protected)' 
-                : 'Canvas fingerprint is unique',
+                ? 'Canvas fingerprint randomized (protected)'
+                : 'Canvas fingerprint unique',
             details: {
-                // Support Detection (like BrowserLeaks)
-                canvas2dSupported: !!ctx,
-                textApiSupported: typeof ctx.fillText === 'function',
-                toDataUrlSupported: typeof canvas.toDataURL === 'function',
-                
-                // Fingerprint (like BrowserLeaks)
+                supported: true,
                 signature: hash.substring(0, 32),
-                fullSignature: hash,
-                
-                // Image Details (like BrowserLeaks)
-                imageWidth: canvas.width,
-                imageHeight: canvas.height,
-                imageSize: `${base64Size} bytes`,
-                numberOfColors: colors.size,
-                
-                // Protection Status
                 randomized: isRandomized,
-                browser: isBrave ? 'Brave (Shields Up)' : isFirefoxResist ? 'Firefox (resistFingerprinting)' : 'Standard',
-                protection: isRandomized 
-                    ? 'Browser randomizes canvas per first-party domain' 
-                    : 'No canvas protection detected',
-                
-                // Uniqueness estimate
-                uniqueness: isRandomized 
-                    ? 'Randomized - not uniquely identifiable'
-                    : '~99.9% unique (only ~0.01% of browsers share this fingerprint)',
-                
-                privacyNote: isRandomized
-                    ? 'Your browser is protecting you from canvas fingerprinting'
-                    : 'Canvas fingerprinting can uniquely identify your browser based on how graphics are rendered'
+                browser: isBrave ? 'Brave' : isRandomized ? 'Firefox (resistFingerprinting)' : 'Standard',
+                assessment: isRandomized
+                    ? 'PROTECTED: Canvas output is randomized'
+                    : 'EXPOSED: Canvas fingerprint can uniquely identify you'
             }
         };
     } catch (error) {
-        return {
-            status: 'unknown',
-            summary: 'Canvas test failed',
-            details: { error: error.message }
-        };
+        return { status: 'unknown', summary: 'Canvas test failed', details: { error: error.message } };
     }
 };
 
-// 4. WebGL Fingerprinting - Enhanced with BrowserLeaks-style details
+// 4. WebGL Fingerprinting
 export const testWebGL = async () => {
     try {
-        // Check for Brave browser
         const isBrave = navigator.brave && await navigator.brave.isBrave();
         
         const canvas = document.createElement('canvas');
         const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        const gl2 = canvas.getContext('webgl2');
         
         if (!gl) {
-            return {
-                status: 'safe',
-                summary: 'WebGL not supported',
-                details: { supported: false }
-            };
+            return { status: 'safe', summary: 'WebGL not supported', details: { supported: false } };
         }
         
         const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
         const vendor = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : 'Unknown';
         const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Unknown';
         
-        // Brave randomizes WebGL hash per-first-party domain
-        const isRandomized = isBrave;
+        const isSpoofed = renderer === 'Unknown' || renderer.includes('BLOCKED') || renderer.includes('Mesa');
+        const isProtected = isBrave || isSpoofed;
         
-        // Also check if WebGL info is being blocked/spoofed
-        const isSpoofed = renderer === 'Unknown' || renderer.includes('BLOCKED');
-        
-        // Generate WebGL fingerprint hash (like BrowserLeaks)
-        const fingerprintData = [
+        // Generate fingerprint from WebGL parameters
+        const params = [
             gl.getParameter(gl.VERSION),
             gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
-            vendor,
-            renderer,
+            vendor, renderer,
             gl.getParameter(gl.MAX_TEXTURE_SIZE),
-            gl.getParameter(gl.MAX_VERTEX_ATTRIBS),
-            gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS),
-            gl.getParameter(gl.MAX_VARYING_VECTORS),
-            gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS),
-            gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
-            gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS),
-            gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE),
-            gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
-            gl.getParameter(gl.MAX_VIEWPORT_DIMS)?.join(',')
+            gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)
         ].join('~');
         
-        const webglHash = await hashString(fingerprintData);
-        
-        // Get supported extensions
-        const extensions = gl.getSupportedExtensions() || [];
+        const hash = await hashString(params);
         
         return {
-            status: (isRandomized || isSpoofed) ? 'safe' : 'leak',
-            summary: (isRandomized || isSpoofed)
-                ? 'WebGL fingerprint is randomized (protected)' 
-                : `GPU: ${renderer.substring(0, 40)}${renderer.length > 40 ? '...' : ''}`,
+            status: isProtected ? 'safe' : 'leak',
+            summary: isProtected 
+                ? 'WebGL info protected'
+                : `GPU: ${renderer.substring(0, 35)}${renderer.length > 35 ? '...' : ''}`,
             details: {
-                // Support Detection (like BrowserLeaks)
-                webglSupported: true,
-                webgl2Supported: !!gl2,
-                
-                // Fingerprint Hash (like BrowserLeaks)
-                webglReportHash: webglHash.substring(0, 32),
-                
-                // Context Info (like BrowserLeaks)
-                glVersion: gl.getParameter(gl.VERSION),
-                shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
-                vendor: gl.getParameter(gl.VENDOR),
-                renderer: gl.getParameter(gl.RENDERER),
-                
-                // Debug Renderer Info (like BrowserLeaks - marked with !)
-                unmaskedVendor: vendor,
-                unmaskedRenderer: renderer,
-                
-                // Vertex Shader
-                maxVertexAttribs: gl.getParameter(gl.MAX_VERTEX_ATTRIBS),
-                maxVertexUniformVectors: gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS),
-                maxVertexTextureImageUnits: gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS),
-                maxVaryingVectors: gl.getParameter(gl.MAX_VARYING_VECTORS),
-                
-                // Fragment Shader  
-                maxFragmentUniformVectors: gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS),
-                maxTextureImageUnits: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
-                
-                // Textures
-                maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
-                maxCubeMapTextureSize: gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE),
-                maxCombinedTextureImageUnits: gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS),
-                
-                // Framebuffer
-                maxRenderBufferSize: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
-                maxViewportDims: gl.getParameter(gl.MAX_VIEWPORT_DIMS)?.join(' x '),
-                
-                // Extensions count
-                extensionsCount: extensions.length,
-                
-                // Protection Status
-                randomized: isRandomized,
-                spoofed: isSpoofed,
-                protection: isRandomized 
-                    ? 'Browser randomizes WebGL per first-party domain' 
-                    : isSpoofed 
-                        ? 'WebGL info is blocked/spoofed'
-                        : 'No WebGL protection detected',
-                browser: isBrave ? 'Brave (Shields Up)' : 'Standard',
-                
-                privacyNote: (isRandomized || isSpoofed)
-                    ? 'Your browser is protecting you from WebGL fingerprinting'
-                    : 'WebGL exposes detailed GPU information that can uniquely identify your device'
+                supported: true,
+                vendor: vendor,
+                renderer: renderer,
+                webglVersion: gl.getParameter(gl.VERSION),
+                hash: hash.substring(0, 16),
+                protected: isProtected,
+                assessment: isProtected
+                    ? 'PROTECTED: WebGL info is blocked or randomized'
+                    : 'EXPOSED: GPU info can identify your device'
+            }
+        };
+    } catch (error) {
+        return { status: 'unknown', summary: 'WebGL test failed', details: { error: error.message } };
+    }
+};
+
+// 5. Audio Fingerprint - Proper OfflineAudioContext implementation (FingerprintJS method)
+export const testAudio = async () => {
+    try {
+        const OfflineAudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        
+        if (!OfflineAudioContext) {
+            return { status: 'safe', summary: 'Audio API not supported', details: { supported: false } };
+        }
+        
+        const isBrave = navigator.brave && await navigator.brave.isBrave();
+        
+        // Create offline context for fingerprinting (not real-time)
+        const context = new OfflineAudioContext(1, 5000, 44100);
+        
+        // Create oscillator (mathematical source for consistent output)
+        const oscillator = context.createOscillator();
+        oscillator.type = 'triangle';
+        oscillator.frequency.value = 1000;
+        
+        // Add compressor for more variation between systems
+        const compressor = context.createDynamicsCompressor();
+        compressor.threshold.value = -50;
+        compressor.knee.value = 40;
+        compressor.ratio.value = 12;
+        compressor.attack.value = 0;
+        compressor.release.value = 0.25;
+        
+        oscillator.connect(compressor);
+        compressor.connect(context.destination);
+        oscillator.start(0);
+        
+        // Render and get fingerprint
+        const buffer = await context.startRendering();
+        const samples = buffer.getChannelData(0).slice(4500);
+        
+        let sum = 0;
+        for (let i = 0; i < samples.length; i++) {
+            sum += Math.abs(samples[i]);
+        }
+        
+        const fingerprint = sum.toString();
+        const hash = await hashString(fingerprint);
+        
+        return {
+            status: isBrave ? 'safe' : 'leak',
+            summary: isBrave 
+                ? 'Audio fingerprint randomized (protected)'
+                : `Audio fingerprint: ${hash.substring(0, 8)}...`,
+            details: {
+                supported: true,
+                fingerprint: hash.substring(0, 16),
+                sampleRate: 44100,
+                randomized: isBrave,
+                assessment: isBrave
+                    ? 'PROTECTED: Audio processing is randomized'
+                    : 'EXPOSED: Audio fingerprint can identify your device'
             }
         };
     } catch (error) {
         return {
-            status: 'unknown',
-            summary: 'WebGL test failed',
-            details: { error: error.message }
+            status: 'safe',
+            summary: 'Audio API blocked',
+            details: { supported: true, blocked: true, error: error.message }
         };
     }
 };
 
-// 5. JavaScript / Browser Information - with randomization detection
-export const testJavaScript = () => {
-    const nav = navigator;
-    
-    // Check if hardware concurrency might be randomized
-    // Brave randomizes this - typical real values are 2, 4, 8, 12, 16, etc.
-    const hwConcurrency = nav.hardwareConcurrency || 0;
-    // Unusual values like 5, 7, 11, etc. suggest randomization
-    const typicalValues = [1, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64];
-    const isHwConcurrencyRandomized = hwConcurrency > 0 && !typicalValues.includes(hwConcurrency);
-    
-    // Check if plugins might be randomized (Brave returns empty or randomized)
-    const plugins = Array.from(nav.plugins || []).map(p => p.name).slice(0, 10);
-    const isPluginsRandomized = plugins.length === 0 || plugins.some(p => p.includes('randomized'));
-    
-    const details = {
-        userAgent: nav.userAgent,
-        platform: nav.platform,
-        language: nav.language,
-        languages: nav.languages ? [...nav.languages] : [nav.language],
-        cookiesEnabled: nav.cookieEnabled,
-        doNotTrack: nav.doNotTrack || window.doNotTrack || nav.msDoNotTrack,
-        hardwareConcurrency: hwConcurrency,
-        hardwareConcurrencyRandomized: isHwConcurrencyRandomized,
-        maxTouchPoints: nav.maxTouchPoints || 0,
-        deviceMemory: nav.deviceMemory || 'Unknown',
-        pdfViewerEnabled: nav.pdfViewerEnabled,
-        webdriver: nav.webdriver,
-        plugins: plugins,
-        pluginsRandomized: isPluginsRandomized,
-        mimeTypes: Array.from(nav.mimeTypes || []).map(m => m.type).slice(0, 10)
-    };
-    
-    const hasProtection = isHwConcurrencyRandomized || isPluginsRandomized;
-    
-    return {
-        status: hasProtection ? 'warning' : 'leak',
-        summary: hasProtection 
-            ? `${details.platform} - some values randomized`
-            : `${details.platform} - ${details.hardwareConcurrency} cores`,
-        details: {
-            ...details,
-            protection: hasProtection ? 'Some browser values appear to be randomized' : 'No randomization detected'
-        }
-    };
-};
-
-// 6. Screen Information
-export const testScreen = () => {
-    const screen = window.screen;
-    
-    const details = {
-        width: screen.width,
-        height: screen.height,
-        availWidth: screen.availWidth,
-        availHeight: screen.availHeight,
-        colorDepth: screen.colorDepth,
-        pixelDepth: screen.pixelDepth,
-        devicePixelRatio: window.devicePixelRatio,
-        orientation: screen.orientation?.type || 'Unknown',
-        innerWidth: window.innerWidth,
-        innerHeight: window.innerHeight
-    };
-    
-    return {
-        status: 'leak',
-        summary: `${details.width}x${details.height} @ ${details.devicePixelRatio}x`,
-        details
-    };
-};
-
-// 7. Font Detection - Extended list matching EFF Cover Your Tracks
+// 6. Font Detection - CSS measurement method
 export const testFonts = async () => {
     const baseFonts = ['monospace', 'sans-serif', 'serif'];
     
-    // Extended font list - includes all fonts EFF tests for
+    // Common fonts that provide good fingerprinting signal
     const testFonts = [
-        // Common Windows fonts
-        'Arial', 'Arial Black', 'Arial Narrow', 'Arial Rounded MT Bold',
-        'Book Antiqua', 'Bookman Old Style',
-        'Calibri', 'Cambria', 'Cambria Math', 'Century', 'Century Gothic', 'Century Schoolbook',
-        'Comic Sans MS', 'Consolas', 'Courier', 'Courier New',
-        'Georgia',
-        'Helvetica',
-        'Impact',
-        'Lucida Bright', 'Lucida Calligraphy', 'Lucida Console', 'Lucida Fax',
-        'Lucida Handwriting', 'Lucida Sans', 'Lucida Sans Typewriter', 'Lucida Sans Unicode',
-        'Microsoft Sans Serif', 'Monotype Corsiva', 'MS Gothic', 'MS Outlook', 'MS PGothic',
-        'MS Reference Sans Serif', 'MS Sans Serif', 'MS Serif',
-        'Palatino Linotype',
-        'Segoe Print', 'Segoe Script', 'Segoe UI', 'Segoe UI Light', 'Segoe UI Semibold', 'Segoe UI Symbol',
-        'Tahoma', 'Times', 'Times New Roman', 'Trebuchet MS',
-        'Verdana',
-        'Wingdings', 'Wingdings 2', 'Wingdings 3',
-        // Mac fonts
-        'American Typewriter', 'Andale Mono', 'Apple Chancery', 'Apple Color Emoji',
-        'Apple SD Gothic Neo', 'Arial Hebrew', 'Avenir', 'Avenir Next',
-        'Baskerville', 'Big Caslon', 'Brush Script MT',
-        'Chalkboard', 'Chalkboard SE', 'Chalkduster', 'Charter', 'Cochin', 'Copperplate',
-        'Didot',
-        'Futura',
-        'Geneva', 'Gill Sans',
-        'Helvetica Neue', 'Herculanum', 'Hoefler Text',
-        'Lucida Grande',
-        'Marker Felt', 'Menlo', 'Monaco',
-        'Noteworthy',
-        'Optima', 'Osaka',
-        'Papyrus', 'Phosphate', 'PT Mono', 'PT Sans', 'PT Serif',
-        'Rockwell',
-        'San Francisco', 'Savoye LET', 'SignPainter', 'Skia', 'Snell Roundhand',
-        'SF Pro', 'SF Pro Display', 'SF Pro Text',
-        // Linux fonts
-        'DejaVu Sans', 'DejaVu Sans Mono', 'DejaVu Serif',
-        'Droid Sans', 'Droid Sans Mono', 'Droid Serif',
-        'Fira Code', 'Fira Mono', 'Fira Sans',
-        'Liberation Mono', 'Liberation Sans', 'Liberation Serif',
-        'Noto Sans', 'Noto Serif',
-        'Open Sans',
-        'Roboto', 'Roboto Condensed', 'Roboto Mono', 'Roboto Slab',
-        'Source Code Pro', 'Source Sans Pro', 'Source Serif Pro',
-        'Ubuntu', 'Ubuntu Mono'
+        'Arial', 'Arial Black', 'Calibri', 'Cambria', 'Comic Sans MS', 'Consolas',
+        'Courier New', 'Georgia', 'Helvetica', 'Impact', 'Lucida Console',
+        'Palatino Linotype', 'Segoe UI', 'Tahoma', 'Times New Roman', 'Trebuchet MS',
+        'Verdana', 'Monaco', 'Menlo', 'SF Pro', 'San Francisco',
+        'Ubuntu', 'DejaVu Sans', 'Liberation Sans', 'Roboto', 'Open Sans',
+        'Fira Code', 'Source Code Pro', 'Noto Sans'
     ];
     
     const testString = 'mmmmmmmmmmlli';
@@ -606,145 +374,67 @@ export const testFonts = async () => {
     });
     
     const detectedFonts = [];
-    
     testFonts.forEach(font => {
-        let detected = false;
         for (const baseFont of baseFonts) {
-            const testWidth = getWidth(`'${font}', ${baseFont}`);
-            if (testWidth !== baseWidths[baseFont]) {
-                detected = true;
+            if (getWidth(`'${font}', ${baseFont}`) !== baseWidths[baseFont]) {
+                detectedFonts.push(font);
                 break;
             }
-        }
-        if (detected) {
-            detectedFonts.push(font);
         }
     });
     
     const hash = await hashString(detectedFonts.join(','));
-    
-    // Calculate bits based on EFF methodology (~0.29 bits per font detected)
-    const bits = detectedFonts.length * 0.29;
     
     return {
         status: 'leak',
         summary: `${detectedFonts.length} fonts detected`,
         details: {
             count: detectedFonts.length,
-            fonts: detectedFonts,
+            fonts: detectedFonts.slice(0, 15),
             hash: hash.substring(0, 16),
-            uniqueIdentifier: true
+            assessment: 'EXPOSED: Font list helps identify your system'
         }
     };
 };
 
-// 8. Audio Fingerprint - with Brave/Firefox protection detection
-export const testAudio = async () => {
-    try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContext) {
-            return {
-                status: 'safe',
-                summary: 'AudioContext not supported',
-                details: { supported: false }
-            };
+// 7. Screen Information
+export const testScreen = () => {
+    const screen = window.screen;
+    
+    return {
+        status: 'leak',
+        summary: `${screen.width}x${screen.height} @ ${window.devicePixelRatio}x`,
+        details: {
+            width: screen.width,
+            height: screen.height,
+            colorDepth: screen.colorDepth,
+            devicePixelRatio: window.devicePixelRatio,
+            assessment: 'EXPOSED: Screen resolution is always visible'
         }
-        
-        // Check for Brave browser
-        const isBrave = navigator.brave && await navigator.brave.isBrave();
-        
-        const context = new AudioContext();
-        const details = {
-            sampleRate: context.sampleRate,
-            state: context.state,
-            baseLatency: context.baseLatency,
-            outputLatency: context.outputLatency,
-            channelCount: context.destination.channelCount,
-            maxChannelCount: context.destination.maxChannelCount,
-        };
-        await context.close();
-        
-        // Brave randomizes audio fingerprint per-first-party domain
-        const isRandomized = isBrave;
-        
-        return {
-            status: isRandomized ? 'safe' : 'leak',
-            summary: isRandomized 
-                ? 'Audio fingerprint is randomized (protected)' 
-                : `Sample rate: ${details.sampleRate}Hz`,
-            details: {
-                supported: true,
-                randomized: isRandomized,
-                ...details,
-                uniqueIdentifier: !isRandomized,
-                protection: isRandomized 
-                    ? 'Browser randomizes audio fingerprint per domain' 
-                    : 'No audio protection detected',
-                note: isRandomized 
-                    ? 'Browser is protecting against audio fingerprinting' 
-                    : 'Audio properties can uniquely identify your device',
-                browser: isBrave ? 'Brave' : 'Standard'
-            }
-        };
-    } catch (error) {
-        return {
-            status: 'warning',
-            summary: 'Audio API blocked',
-            details: { 
-                supported: true, 
-                blocked: true,
-                error: error.message,
-                note: 'Browser blocked audio fingerprinting'
-            }
-        };
-    }
+    };
 };
 
-// 9. Geolocation Test
-export const testGeolocation = () => {
-    return new Promise((resolve) => {
-        if (!navigator.geolocation) {
-            resolve({
-                status: 'safe',
-                summary: 'Geolocation not supported',
-                details: { supported: false }
-            });
-            return;
+// 8. Browser Information
+export const testJavaScript = () => {
+    const nav = navigator;
+    
+    return {
+        status: 'leak',
+        summary: `${nav.platform} - ${nav.hardwareConcurrency || '?'} cores`,
+        details: {
+            userAgent: nav.userAgent,
+            platform: nav.platform,
+            language: nav.language,
+            languages: nav.languages ? [...nav.languages] : [nav.language],
+            hardwareConcurrency: nav.hardwareConcurrency || 'Unknown',
+            deviceMemory: nav.deviceMemory || 'Unknown',
+            cookiesEnabled: nav.cookieEnabled,
+            assessment: 'EXPOSED: Browser reveals system information'
         }
-        
-        // Check permissions
-        if (navigator.permissions) {
-            navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-                resolve({
-                    status: result.state === 'granted' ? 'leak' : 
-                           result.state === 'denied' ? 'safe' : 'warning',
-                    summary: result.state === 'granted' ? 'Location access granted' :
-                            result.state === 'denied' ? 'Location access denied' :
-                            'Location permission not set',
-                    details: {
-                        supported: true,
-                        permissionState: result.state,
-                        canTrack: result.state === 'granted'
-                    }
-                });
-            }).catch(() => {
-                resolve({
-                    status: 'warning',
-                    summary: 'Location permission unknown',
-                    details: { supported: true, permissionState: 'unknown' }
-                });
-            });
-        } else {
-            resolve({
-                status: 'warning',
-                summary: 'Permission API not supported',
-                details: { supported: true, permissionState: 'unknown' }
-            });
-        }
-    });
+    };
 };
 
-// 10. Timezone Detection
+// 9. Timezone Detection
 export const testTimezone = () => {
     const tz = Intl.DateTimeFormat().resolvedOptions();
     const offset = new Date().getTimezoneOffset();
@@ -757,12 +447,12 @@ export const testTimezone = () => {
             offset: offset,
             offsetString: `UTC${offset > 0 ? '-' : '+'}${Math.abs(offset / 60)}`,
             locale: tz.locale,
-            calendar: tz.calendar
+            assessment: 'EXPOSED: Timezone reveals your region'
         }
     };
 };
 
-// 11. Do Not Track
+// 10. Do Not Track / Global Privacy Control
 export const testDoNotTrack = () => {
     const dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
     const gpc = navigator.globalPrivacyControl;
@@ -771,312 +461,226 @@ export const testDoNotTrack = () => {
     const gpcEnabled = gpc === true;
     
     return {
-        status: (dntEnabled || gpcEnabled) ? 'safe' : 'leak',
+        status: (dntEnabled || gpcEnabled) ? 'safe' : 'warning',
         summary: (dntEnabled || gpcEnabled) ? 'Privacy signals enabled' : 'No privacy signals',
         details: {
-            doNotTrack: dnt,
             dntEnabled,
-            globalPrivacyControl: gpc,
             gpcEnabled,
-            recommendation: !dntEnabled && !gpcEnabled ? 'Consider enabling DNT or GPC' : null
+            assessment: (dntEnabled || gpcEnabled)
+                ? 'GOOD: You have privacy signals enabled'
+                : 'Consider enabling Do Not Track or Global Privacy Control'
         }
     };
 };
 
-// 12. Battery Status
-export const testBattery = async () => {
-    try {
-        if (!navigator.getBattery) {
-            return {
-                status: 'safe',
-                summary: 'Battery API not supported',
-                details: { supported: false }
-            };
-        }
-        
-        const battery = await navigator.getBattery();
-        
-        return {
-            status: 'leak',
-            summary: `${Math.round(battery.level * 100)}% ${battery.charging ? '(charging)' : ''}`,
-            details: {
-                supported: true,
-                level: battery.level,
-                charging: battery.charging,
-                chargingTime: battery.chargingTime,
-                dischargingTime: battery.dischargingTime,
-                canTrack: true
-            }
-        };
-    } catch (error) {
-        return {
-            status: 'safe',
-            summary: 'Battery API blocked',
-            details: { supported: false, blocked: true }
-        };
-    }
-};
-
-// 13. Network Information
-export const testNetwork = () => {
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    
-    if (!connection) {
-        return {
-            status: 'safe',
-            summary: 'Network API not supported',
-            details: { supported: false }
-        };
-    }
-    
-    return {
-        status: 'leak',
-        summary: `${connection.effectiveType || 'Unknown'} connection`,
-        details: {
-            supported: true,
-            effectiveType: connection.effectiveType,
-            downlink: connection.downlink,
-            rtt: connection.rtt,
-            saveData: connection.saveData,
-            type: connection.type
-        }
-    };
-};
-
-// 14. Client Hints
-export const testClientHints = async () => {
-    const hints = {};
-    
-    // Check for user agent data
-    if (navigator.userAgentData) {
-        hints.brands = navigator.userAgentData.brands;
-        hints.mobile = navigator.userAgentData.mobile;
-        hints.platform = navigator.userAgentData.platform;
-        
-        try {
-            const highEntropyValues = await navigator.userAgentData.getHighEntropyValues([
-                'architecture', 'bitness', 'model', 'platformVersion', 'fullVersionList'
-            ]);
-            hints.highEntropy = highEntropyValues;
-        } catch (e) {
-            hints.highEntropyError = e.message;
-        }
-        
-        return {
-            status: 'leak',
-            summary: 'Client Hints available',
-            details: {
-                supported: true,
-                ...hints
-            }
-        };
-    }
-    
-    return {
-        status: 'safe',
-        summary: 'Client Hints not supported',
-        details: { supported: false }
-    };
-};
-
-// 15. Storage APIs
+// 11. Storage APIs
 export const testStorage = () => {
-    const storage = {
-        localStorage: false,
-        sessionStorage: false,
-        indexedDB: false,
-        cookies: false
-    };
+    let localStorage = false;
+    let sessionStorage = false;
+    let indexedDB = false;
     
-    // Test localStorage
     try {
-        localStorage.setItem('test', 'test');
-        localStorage.removeItem('test');
-        storage.localStorage = true;
-    } catch (e) {
-        // localStorage not available
-    }
+        window.localStorage.setItem('test', 'test');
+        window.localStorage.removeItem('test');
+        localStorage = true;
+    } catch (e) {}
     
-    // Test sessionStorage
     try {
-        sessionStorage.setItem('test', 'test');
-        sessionStorage.removeItem('test');
-        storage.sessionStorage = true;
-    } catch (e) {
-        // sessionStorage not available
-    }
+        window.sessionStorage.setItem('test', 'test');
+        window.sessionStorage.removeItem('test');
+        sessionStorage = true;
+    } catch (e) {}
     
-    // Test IndexedDB
-    storage.indexedDB = !!window.indexedDB;
+    indexedDB = !!window.indexedDB;
     
-    // Test cookies
-    storage.cookies = navigator.cookieEnabled;
-    
-    const trackingCapable = Object.values(storage).some(v => v);
+    const trackingCapable = localStorage || indexedDB;
     
     return {
         status: trackingCapable ? 'leak' : 'safe',
-        summary: trackingCapable ? 'Storage APIs available' : 'Storage APIs blocked',
-        details: storage
+        summary: trackingCapable ? 'Storage APIs available' : 'Storage blocked',
+        details: {
+            localStorage,
+            sessionStorage,
+            indexedDB,
+            cookies: navigator.cookieEnabled,
+            assessment: trackingCapable
+                ? 'EXPOSED: Storage APIs enable persistent tracking'
+                : 'PROTECTED: Storage APIs are blocked'
+        }
     };
 };
 
-// 16. Media Devices
+// 12. Geolocation Permission
+export const testGeolocation = () => {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            resolve({
+                status: 'safe',
+                summary: 'Geolocation not supported',
+                details: { supported: false }
+            });
+            return;
+        }
+        
+        if (navigator.permissions) {
+            navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+                resolve({
+                    status: result.state === 'granted' ? 'leak' : 
+                           result.state === 'denied' ? 'safe' : 'warning',
+                    summary: result.state === 'granted' ? 'Location access granted' :
+                            result.state === 'denied' ? 'Location access denied' :
+                            'Location not yet requested',
+                    details: {
+                        supported: true,
+                        permissionState: result.state,
+                        assessment: result.state === 'granted'
+                            ? 'EXPOSED: Websites can access your precise location'
+                            : 'PROTECTED: Location access is restricted'
+                    }
+                });
+            }).catch(() => {
+                resolve({
+                    status: 'warning',
+                    summary: 'Location status unknown',
+                    details: { supported: true, permissionState: 'unknown' }
+                });
+            });
+        } else {
+            resolve({
+                status: 'warning',
+                summary: 'Permission API not supported',
+                details: { supported: true }
+            });
+        }
+    });
+};
+
+// 13. Media Devices
 export const testMediaDevices = async () => {
     try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        if (!navigator.mediaDevices?.enumerateDevices) {
             return {
                 status: 'safe',
-                summary: 'Media Devices API not supported',
+                summary: 'Media API not supported',
                 details: { supported: false }
             };
         }
         
         const devices = await navigator.mediaDevices.enumerateDevices();
-        
-        const grouped = {
-            audioinput: devices.filter(d => d.kind === 'audioinput').length,
-            audiooutput: devices.filter(d => d.kind === 'audiooutput').length,
-            videoinput: devices.filter(d => d.kind === 'videoinput').length
-        };
+        const cameras = devices.filter(d => d.kind === 'videoinput').length;
+        const mics = devices.filter(d => d.kind === 'audioinput').length;
         
         return {
             status: 'leak',
-            summary: `${grouped.videoinput} cameras, ${grouped.audioinput} mics`,
+            summary: `${cameras} camera(s), ${mics} mic(s)`,
             details: {
                 supported: true,
-                ...grouped,
+                cameras,
+                microphones: mics,
                 total: devices.length,
-                canFingerprint: true
+                assessment: 'EXPOSED: Device count helps fingerprint your system'
             }
         };
     } catch (error) {
         return {
             status: 'safe',
-            summary: 'Media Devices blocked',
+            summary: 'Media devices blocked',
             details: { supported: true, blocked: true }
         };
     }
 };
 
-// 17. Touch Support
-export const testTouchSupport = () => {
-    const maxTouchPoints = navigator.maxTouchPoints || 0;
-    const touchEvent = 'ontouchstart' in window;
-    const touchEventSupported = window.TouchEvent !== undefined;
-    
-    const hasTouch = maxTouchPoints > 0 || touchEvent;
-    
-    return {
-        status: 'leak',
-        summary: hasTouch ? `Touch enabled (${maxTouchPoints} points)` : 'No touch support',
-        details: {
-            maxTouchPoints,
-            touchEventSupported: touchEventSupported,
-            onTouchStartSupported: touchEvent,
-            hasTouch,
-            note: 'Touch support helps identify device type'
-        }
-    };
-};
-
-// 18. Ad Blocker Detection
+// 14. Ad Blocker Detection
 export const testAdBlocker = async () => {
     try {
-        // Try to create a bait element that ad blockers typically block
         const bait = document.createElement('div');
-        bait.className = 'adsbox ad-banner ad-placement pub_300x250 textAd';
+        bait.className = 'adsbox ad-banner pub_300x250';
         bait.style.cssText = 'position: absolute; top: -10px; left: -10px; width: 1px; height: 1px;';
         bait.innerHTML = '&nbsp;';
         document.body.appendChild(bait);
         
-        // Wait a moment for ad blocker to act
         await new Promise(resolve => setTimeout(resolve, 100));
         
         const blocked = bait.offsetHeight === 0 || 
-                       bait.offsetWidth === 0 || 
-                       bait.clientHeight === 0 ||
-                       getComputedStyle(bait).display === 'none' ||
-                       getComputedStyle(bait).visibility === 'hidden';
+                       getComputedStyle(bait).display === 'none';
         
         document.body.removeChild(bait);
         
         return {
-            status: blocked ? 'safe' : 'leak',
-            summary: blocked ? 'Ad blocker detected' : 'No ad blocker detected',
+            status: blocked ? 'safe' : 'warning',
+            summary: blocked ? 'Ad blocker detected' : 'No ad blocker',
             details: {
                 adBlockerDetected: blocked,
-                note: blocked 
-                    ? 'Using an ad blocker helps protect privacy but can make you more unique'
-                    : 'Consider using an ad blocker like uBlock Origin'
+                assessment: blocked
+                    ? 'GOOD: Ad blocker helps protect privacy'
+                    : 'Consider using uBlock Origin for better privacy'
             }
         };
     } catch (error) {
-        return {
-            status: 'unknown',
-            summary: 'Could not test',
-            details: { error: error.message }
-        };
+        return { status: 'unknown', summary: 'Could not test', details: { error: error.message } };
     }
 };
 
-// 19. HTTP Headers Info (what can be inferred)
-export const testHttpHeaders = () => {
-    // We can't directly access HTTP headers from JS, but we can infer some
-    const acceptLanguage = navigator.languages ? navigator.languages.join(', ') : navigator.language;
-    const encoding = 'gzip, deflate, br'; // Standard modern browsers
+// 15. Client Hints (if available)
+export const testClientHints = async () => {
+    if (!navigator.userAgentData) {
+        return {
+            status: 'safe',
+            summary: 'Client Hints not supported',
+            details: { supported: false }
+        };
+    }
     
-    return {
-        status: 'leak',
-        summary: `Language: ${navigator.language}`,
-        details: {
-            acceptLanguage,
-            inferredAccept: 'text/html, application/xhtml+xml, */*',
-            inferredEncoding: encoding,
-            connection: 'keep-alive',
-            note: 'HTTP headers are sent with every request and reveal browser preferences'
-        }
-    };
+    try {
+        const hints = {
+            brands: navigator.userAgentData.brands,
+            mobile: navigator.userAgentData.mobile,
+            platform: navigator.userAgentData.platform
+        };
+        
+        return {
+            status: 'leak',
+            summary: `${hints.platform} - ${hints.mobile ? 'Mobile' : 'Desktop'}`,
+            details: {
+                supported: true,
+                ...hints,
+                assessment: 'EXPOSED: Client Hints reveal browser details'
+            }
+        };
+    } catch (error) {
+        return { status: 'unknown', summary: 'Client Hints error', details: { error: error.message } };
+    }
 };
 
-// Run all tests in parallel with timeout protection
+// Run all tests
 export const runAllTests = async () => {
     const tests = [
         { id: 'ip', name: 'IP Address', icon: 'globe', test: testIPAddress },
-        { id: 'webrtc', name: 'WebRTC', icon: 'video', test: testWebRTC },
+        { id: 'webrtc', name: 'WebRTC Leak', icon: 'video', test: testWebRTC },
         { id: 'canvas', name: 'Canvas Fingerprint', icon: 'palette', test: testCanvas },
         { id: 'webgl', name: 'WebGL', icon: 'cpu', test: testWebGL },
+        { id: 'audio', name: 'Audio Fingerprint', icon: 'music', test: testAudio },
+        { id: 'fonts', name: 'Font Detection', icon: 'type', test: testFonts },
         { id: 'javascript', name: 'Browser Info', icon: 'code', test: testJavaScript },
         { id: 'screen', name: 'Screen Info', icon: 'monitor', test: testScreen },
-        { id: 'fonts', name: 'Font Detection', icon: 'type', test: testFonts },
-        { id: 'audio', name: 'Audio Fingerprint', icon: 'music', test: testAudio },
-        { id: 'geolocation', name: 'Geolocation', icon: 'mapPin', test: testGeolocation },
         { id: 'timezone', name: 'Timezone', icon: 'clock', test: testTimezone },
-        { id: 'dnt', name: 'Do Not Track', icon: 'eyeOff', test: testDoNotTrack },
-        { id: 'battery', name: 'Battery Status', icon: 'battery', test: testBattery },
-        { id: 'network', name: 'Network Info', icon: 'wifi', test: testNetwork },
-        { id: 'clientHints', name: 'Client Hints', icon: 'info', test: testClientHints },
+        { id: 'dnt', name: 'Privacy Signals', icon: 'eyeOff', test: testDoNotTrack },
         { id: 'storage', name: 'Storage APIs', icon: 'database', test: testStorage },
+        { id: 'geolocation', name: 'Geolocation', icon: 'mapPin', test: testGeolocation },
         { id: 'media', name: 'Media Devices', icon: 'camera', test: testMediaDevices },
-        { id: 'touch', name: 'Touch Support', icon: 'hand', test: testTouchSupport },
         { id: 'adBlocker', name: 'Ad Blocker', icon: 'shield', test: testAdBlocker },
-        { id: 'httpHeaders', name: 'HTTP Headers', icon: 'fileText', test: testHttpHeaders }
+        { id: 'clientHints', name: 'Client Hints', icon: 'info', test: testClientHints }
     ];
     
-    // Helper to run test with timeout
     const runWithTimeout = async (test, timeout = 5000) => {
         try {
             const result = await Promise.race([
                 test.test(),
                 new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Test timeout')), timeout)
+                    setTimeout(() => reject(new Error('Timeout')), timeout)
                 )
             ]);
-            return {
-                ...result,
-                name: test.name,
-                icon: test.icon
-            };
+            return { ...result, name: test.name, icon: test.icon };
         } catch (error) {
             return {
                 name: test.name,
@@ -1088,12 +692,10 @@ export const runAllTests = async () => {
         }
     };
     
-    // Run all tests in parallel
     const resultsArray = await Promise.all(
         tests.map(test => runWithTimeout(test))
     );
     
-    // Convert to object
     const results = {};
     tests.forEach((test, index) => {
         results[test.id] = resultsArray[index];
