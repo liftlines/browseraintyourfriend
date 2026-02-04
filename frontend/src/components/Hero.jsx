@@ -108,24 +108,6 @@ const Hero = ({ stats, isScanning, privacyData }) => {
                                 </div>
                             </div>
                         </div>
-                        
-                        {/* Items summary */}
-                        {privacyData && (
-                            <div className="text-center px-4 py-2 bg-muted/30 rounded-full border border-border">
-                                <span className="text-sm text-muted-foreground font-sans">
-                                    Identifying items exposed: 
-                                </span>
-                                <span className={`text-sm font-medium ml-1 ${
-                                    privacyData.totalItems <= 5 
-                                        ? 'text-success' 
-                                        : privacyData.totalItems <= 10
-                                            ? 'text-warning'
-                                            : 'text-destructive'
-                                }`}>
-                                    {privacyData.totalItems} of {privacyData.maxPossibleItems}
-                                </span>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>
