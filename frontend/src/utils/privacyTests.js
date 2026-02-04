@@ -26,8 +26,9 @@ export const testIPAddress = async () => {
         const isTor = data.is_tor === true;
         const isDatacenter = data.is_datacenter === true;
         
-        // Any of these indicate hidden IP
-        const isProtected = isVpn || isProxy || isTor;
+        // Datacenter IPs indicate VPN/cloud usage - regular users don't have datacenter IPs
+        // So we treat datacenter detection as a sign of IP protection
+        const isProtected = isVpn || isProxy || isTor || isDatacenter;
         const status = isProtected ? 'safe' : 'leak';
         
         // Build protection type string
@@ -35,6 +36,7 @@ export const testIPAddress = async () => {
         if (isVpn) protectionType.push('VPN');
         if (isProxy) protectionType.push('Proxy');
         if (isTor) protectionType.push('Tor');
+        if (isDatacenter && !isVpn && !isProxy && !isTor) protectionType.push('Datacenter/VPN');
         
         const location = data.location || {};
         const company = data.company || {};
@@ -56,7 +58,7 @@ export const testIPAddress = async () => {
                 datacenterDetected: isDatacenter,
                 protectionType: protectionType.length > 0 ? protectionType.join(', ') : 'None',
                 assessment: isProtected 
-                    ? `PROTECTED: Your real IP is hidden behind ${protectionType.join('/')}`
+                    ? `PROTECTED: Your real IP is hidden (${protectionType.join('/')} detected)`
                     : 'EXPOSED: Your real IP address and location are visible'
             }
         };
