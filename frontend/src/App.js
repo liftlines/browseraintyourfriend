@@ -7,7 +7,7 @@ import UniquenessCard from '@/components/UniquenessCard';
 import RecommendationsCard from '@/components/RecommendationsCard';
 import Footer from '@/components/Footer';
 import { runAllTests } from '@/utils/privacyTests';
-import { calculateEntropy, getRecommendations } from '@/utils/entropyCalculator';
+import { calculateEntropy } from '@/utils/entropyCalculator';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 
@@ -16,7 +16,6 @@ const HomePage = () => {
     const [isScanning, setIsScanning] = useState(true);
     const [stats, setStats] = useState(null);
     const [entropy, setEntropy] = useState(null);
-    const [recommendations, setRecommendations] = useState([]);
     
     const calculateStats = useCallback((results) => {
         if (!results) return null;
@@ -36,7 +35,6 @@ const HomePage = () => {
         setResults(null);
         setStats(null);
         setEntropy(null);
-        setRecommendations([]);
         
         toast.info('Starting privacy scan...', {
             description: 'Analyzing your browser fingerprint'
@@ -52,10 +50,6 @@ const HomePage = () => {
             // Calculate entropy/uniqueness
             const entropyData = calculateEntropy(testResults);
             setEntropy(entropyData);
-            
-            // Get recommendations
-            const recs = getRecommendations(testResults, entropyData);
-            setRecommendations(recs);
             
             if (newStats.leak > newStats.safe) {
                 toast.error(`${newStats.leak} privacy leaks detected`, {
