@@ -31,7 +31,6 @@ const HomePage = () => {
         setIsScanning(true);
         setResults(null);
         setStats(null);
-        setEntropy(null);
         
         toast.info('Starting privacy scan...', {
             description: 'Analyzing your browser fingerprint'
@@ -44,18 +43,10 @@ const HomePage = () => {
             const newStats = calculateStats(testResults);
             setStats(newStats);
             
-            // Calculate entropy/uniqueness
-            const entropyData = calculateEntropy(testResults);
-            setEntropy(entropyData);
-            
             if (newStats.leak > newStats.safe) {
-                toast.error(`${newStats.leak} privacy leaks detected`, {
-                    description: `${entropyData.totalItems} identifying items exposed`
-                });
+                toast.error(`${newStats.leak} privacy leaks detected`);
             } else if (newStats.leak > 0) {
-                toast.warning(`${newStats.leak} potential exposures found`, {
-                    description: 'Some privacy improvements recommended'
-                });
+                toast.warning(`${newStats.leak} potential exposures found`);
             } else {
                 toast.success('Great privacy posture!', {
                     description: 'Your browser is well protected'
@@ -80,16 +71,7 @@ const HomePage = () => {
         <div className="min-h-screen bg-background">
             <Header onRefresh={runScan} isScanning={isScanning} />
             <main>
-                <Hero stats={stats} isScanning={isScanning} privacyData={entropy} />
-                
-                {/* Uniqueness Card - Shows after scanning */}
-                {!isScanning && entropy && (
-                    <section className="px-4 sm:px-6 lg:px-8 pb-8">
-                        <div className="max-w-6xl mx-auto">
-                            <UniquenessCard privacyData={entropy} />
-                        </div>
-                    </section>
-                )}
+                <Hero stats={stats} isScanning={isScanning} />
                 
                 <ResultsGrid results={results} isLoading={isScanning} />
                 
