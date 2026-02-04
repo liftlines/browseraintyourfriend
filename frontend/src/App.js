@@ -96,11 +96,11 @@ const HomePage = () => {
                 
                 <ResultsGrid results={results} isLoading={isScanning} />
                 
-                {/* Recommendations - Always shows after scanning */}
+                {/* Privacy Tips & Logos CTA - Always shows after scanning */}
                 {!isScanning && (
                     <section className="px-4 sm:px-6 lg:px-8 pb-8">
                         <div className="max-w-6xl mx-auto">
-                            <RecommendationsCard recommendations={recommendations} />
+                            <RecommendationsCard />
                         </div>
                     </section>
                 )}
