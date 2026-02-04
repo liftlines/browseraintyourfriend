@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Fingerprint, TrendingUp, Info, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Info, ShieldCheck, ShieldAlert } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
@@ -13,7 +13,7 @@ import {
 const UniquenessCard = ({ privacyData }) => {
     if (!privacyData) return null;
     
-    const { totalItems, maxPossibleItems, privacyScore, assessment, trackability, breakdown } = privacyData;
+    const { totalItems, maxPossibleItems, privacyScore, assessment, trackability } = privacyData;
     
     // Color based on privacy score
     const getColorClass = (score) => {
