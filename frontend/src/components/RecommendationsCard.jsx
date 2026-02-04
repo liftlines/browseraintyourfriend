@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Shield, ExternalLink, ChevronRight, Rocket } from 'lucide-react';
 
 const RecommendationsCard = ({ recommendations }) => {
-    if (!recommendations || recommendations.length === 0) return null;
+    const hasRecommendations = recommendations && recommendations.length > 0;
     
     const getPriorityColor = (priority) => {
         switch (priority) {
