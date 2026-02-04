@@ -85,7 +85,7 @@ const RecommendationsCard = () => {
                             <Button
                                 size="lg"
                                 className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-6 text-base"
-                                onClick={() => window.open('https://logos.co', '_blank')}
+                                onClick={handleCtaClick}
                             >
                                 Escape with Logos
                                 <ExternalLink className="h-5 w-5 ml-2" />
