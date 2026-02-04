@@ -10,59 +10,58 @@ const hashString = async (str) => {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// 1. IP Address Detection - Enhanced with VPN/Proxy detection
+// 1. IP Address Detection - Using ipapi.is for reliable VPN/Proxy detection
 export const testIPAddress = async () => {
     try {
-        // Add cache-busting to ensure fresh IP lookup on each scan
+        // Use ipapi.is which has proper VPN/proxy detection built-in
         const cacheBuster = Date.now();
-        const response = await fetch(`https://ipapi.co/json/?_=${cacheBuster}`, {
-            cache: 'no-store',
-            headers: {
-                'Cache-Control': 'no-cache'
-            }
+        const response = await fetch(`https://api.ipapi.is/?_=${cacheBuster}`, {
+            cache: 'no-store'
         });
         const data = await response.json();
         
-        // VPN/Proxy Detection - Check multiple indicators
-        const orgLower = (data.org || '').toLowerCase();
-        const vpnKeywords = ['vpn', 'proxy', 'hosting', 'datacenter', 'server', 'cloud', 
-                           'digital ocean', 'amazon', 'google cloud', 'microsoft', 
-                           'linode', 'vultr', 'ovh', 'hetzner', 'choopa', 'mullvad',
-                           'nordvpn', 'expressvpn', 'surfshark', 'private internet'];
-        const isVpnByOrg = vpnKeywords.some(kw => orgLower.includes(kw));
+        // ipapi.is provides direct VPN/proxy detection
+        const isVpn = data.is_vpn === true;
+        const isProxy = data.is_proxy === true;
+        const isTor = data.is_tor === true;
+        const isDatacenter = data.is_datacenter === true;
         
-        // Check timezone mismatch (strong VPN indicator)
-        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const ipTimezone = data.timezone;
-        const timezoneMismatch = ipTimezone && browserTimezone !== ipTimezone;
+        // Any of these indicate hidden IP
+        const isProtected = isVpn || isProxy || isTor;
+        const status = isProtected ? 'safe' : 'leak';
         
-        const isVpn = isVpnByOrg || timezoneMismatch;
-        const status = isVpn ? 'safe' : 'leak';
+        // Build protection type string
+        let protectionType = [];
+        if (isVpn) protectionType.push('VPN');
+        if (isProxy) protectionType.push('Proxy');
+        if (isTor) protectionType.push('Tor');
+        
+        const location = data.location || {};
+        const company = data.company || {};
         
         return {
             status,
-            summary: isVpn 
-                ? `VPN/Proxy detected - real IP hidden`
+            summary: isProtected 
+                ? `${protectionType.join('/')} detected - real IP hidden`
                 : `Your real IP is visible (${data.ip})`,
             details: {
                 ipAddress: data.ip,
-                country: data.country_name,
-                city: data.city,
-                region: data.region,
-                isp: data.org,
+                country: location.country,
+                city: location.city,
+                region: location.state,
+                isp: company.name || data.asn?.org,
                 vpnDetected: isVpn,
-                vpnIndicators: {
-                    orgNameMatch: isVpnByOrg,
-                    timezoneMismatch: timezoneMismatch
-                },
-                browserTimezone: browserTimezone,
-                ipTimezone: ipTimezone,
-                assessment: isVpn 
-                    ? 'PROTECTED: Your real IP is hidden behind a VPN/Proxy'
+                proxyDetected: isProxy,
+                torDetected: isTor,
+                datacenterDetected: isDatacenter,
+                protectionType: protectionType.length > 0 ? protectionType.join(', ') : 'None',
+                assessment: isProtected 
+                    ? `PROTECTED: Your real IP is hidden behind ${protectionType.join('/')}`
                     : 'EXPOSED: Your real IP address and location are visible'
             }
         };
     } catch (error) {
+        // Fallback to basic IP detection
         try {
             const cacheBuster = Date.now();
             const response = await fetch(`https://api.ipify.org?format=json&_=${cacheBuster}`, {
@@ -70,12 +69,13 @@ export const testIPAddress = async () => {
             });
             const data = await response.json();
             return {
-                status: 'leak',
-                summary: `Your real IP is visible (${data.ip})`,
+                status: 'warning',
+                summary: `IP: ${data.ip} (VPN status unknown)`,
                 details: {
                     ipAddress: data.ip,
-                    vpnDetected: false,
-                    limitedInfo: 'Full geolocation unavailable'
+                    vpnDetected: null,
+                    note: 'VPN detection unavailable - using fallback API',
+                    assessment: 'UNKNOWN: Could not determine VPN status'
                 }
             };
         } catch (e) {
