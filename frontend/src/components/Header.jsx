@@ -28,7 +28,7 @@ const Header = ({ onRefresh, isScanning }) => {
                             {isScanning ? 'Scanning...' : 'Re-scan'}
                         </Button>
                         <a
-                            href="https://github.com"
+                            href="https://github.com/liftlines/browseraintyourfriend"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-2 rounded-lg hover:bg-muted transition-colors"
