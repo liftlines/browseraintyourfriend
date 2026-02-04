@@ -9,34 +9,30 @@ Build a web application inspired by `browserleaks.com` that automatically detect
 
 ## Core Features Implemented
 
-### Privacy Tests (19 total)
-1. **IP Address Detection** - Reveals IP, location, ISP, with VPN/proxy detection
-2. **WebRTC Leak Test** - Detects local/public IP leaks via WebRTC
-3. **Canvas Fingerprint** - Unique browser fingerprint from graphics rendering
-4. **WebGL Fingerprint** - GPU information exposure
-5. **Browser Info (JavaScript)** - User agent, platform, hardware info
-6. **Screen Info** - Resolution, color depth, pixel ratio
-7. **Font Detection** - Installed fonts enumeration
-8. **Audio Fingerprint** - Audio processing characteristics
-9. **Geolocation** - Permission state for GPS location
-10. **Timezone** - System timezone detection
-11. **Do Not Track** - DNT/GPC signal status
-12. **Battery Status** - Battery API exposure
-13. **Network Info** - Connection type and speed
-14. **Client Hints** - UA-CH headers
-15. **Storage APIs** - Local/session storage, IndexedDB, cookies
-16. **Media Devices** - Camera/microphone enumeration
-17. **Touch Support** - Touch capability detection
-18. **Ad Blocker** - Ad blocker presence detection
-19. **HTTP Headers** - Inferred header information
+### Privacy Tests (15 total - robust, high-entropy signals only)
+Based on FingerprintJS and EFF Cover Your Tracks implementations:
 
-### UI Components
-- **Hero Section**: Privacy Score (0-100%), Exposed/Protected/Warnings counts, "Identifying items exposed" metric
-- **Privacy Assessment Card**: Trackability assessment, score bar, exposed information breakdown
-- **Results Grid**: Individual test cards with detailed information
-- **Recommendations Card**: Prioritized privacy recommendations with logos.co CTA
-- **Header**: Re-scan button, branding
-- **Footer**: Links and credits
+1. **IP Address Detection** - Reveals IP, location, ISP with VPN/proxy detection
+2. **WebRTC Leak Test** - Detects local/public IP leaks via WebRTC ICE candidates
+3. **Canvas Fingerprint** - FingerprintJS-style implementation with emoji rendering
+4. **WebGL Fingerprint** - GPU vendor/renderer information exposure
+5. **Audio Fingerprint** - Proper OfflineAudioContext implementation with oscillator+compressor
+6. **Font Detection** - CSS measurement-based font enumeration
+7. **Browser Info** - User agent, platform, hardware concurrency
+8. **Screen Info** - Resolution, color depth, pixel ratio
+9. **Timezone** - System timezone detection
+10. **Privacy Signals (DNT/GPC)** - Do Not Track and Global Privacy Control status
+11. **Storage APIs** - LocalStorage, SessionStorage, IndexedDB availability
+12. **Geolocation** - Permission state for GPS location
+13. **Media Devices** - Camera/microphone enumeration
+14. **Ad Blocker Detection** - Bait element detection method
+15. **Client Hints** - UA-CH headers if supported
+
+### Removed Tests (unreliable, low-entropy per research)
+- ~~Battery API~~ - Low entropy (~1-2 bits), inconsistent across sessions
+- ~~Touch Support~~ - Poor uniqueness (<5 bits), varies by OS updates
+- ~~Network Info API~~ - Permission-blocked, generic outputs (<3 bits)
+- ~~HTTP Headers~~ - Cannot be tested client-side accurately
 
 ## Technical Architecture
 
@@ -44,12 +40,11 @@ Build a web application inspired by `browserleaks.com` that automatically detect
 - **Framework**: React.js with Create React App (CRACO)
 - **Styling**: TailwindCSS, shadcn/ui components
 - **State**: React hooks (useState, useEffect, useCallback)
-- **Routing**: React Router (single page)
 
 ### Key Files
-- `/app/frontend/src/App.js` - Main app orchestration
-- `/app/frontend/src/utils/privacyTests.js` - All 19 privacy test implementations
+- `/app/frontend/src/utils/privacyTests.js` - Robust implementations of 15 tests
 - `/app/frontend/src/utils/entropyCalculator.js` - "Identifying items" score calculation
+- `/app/frontend/src/App.js` - Main app orchestration
 - `/app/frontend/src/components/` - UI components
 
 ### External API
@@ -59,23 +54,30 @@ Build a web application inspired by `browserleaks.com` that automatically detect
 ## Completed Work
 
 ### Session 2025-02-02
-- **P0 Fix**: Completed "bits of entropy" → "identifying items" refactoring
-  - Updated `App.js` to pass `privacyData` prop correctly
-  - Fixed toast notification to show "X identifying items exposed"
-  - Verified `Hero.jsx` and `UniquenessCard.jsx` work with new data structure
-- **P1 Fix**: Test logic audit and corrections
-  - Fixed WebRTC private IP detection for 172.16-31.x.x range (was incorrectly matching all 172.x)
-  - Improved Firefox `resistFingerprinting` detection in canvas test (now uses pixel comparison instead of CSS check)
-- **Testing**: 100% pass rate on all 10 test cases
+- Initial build with 19 tests
+- Fixed "bits → items" metric confusion
+- Fixed prop passing issues
+
+### Session 2025-02-04 (Current)
+- **Major Refactor**: Rewrote all tests based on FingerprintJS/EFF research
+- **Removed 4 unreliable tests**: Battery, Touch, Network, HTTP Headers
+- **Improved Audio test**: Now uses proper OfflineAudioContext with oscillator and compressor (FingerprintJS method)
+- **Improved Canvas test**: Better Firefox resistFingerprinting detection
+- **Testing**: 100% pass rate on all test cases
+
+## Research References
+- FingerprintJS implementation: https://github.com/fingerprintjs/fingerprintjs
+- EFF Cover Your Tracks: https://coveryourtracks.eff.org
+- Common fingerprinting issues: Volatility, spoofing detection, browser anti-fingerprinting
 
 ## Known Limitations
-- VPN detection is heuristic-based (org name, ASN, timezone mismatch)
-- Firefox `resistFingerprinting` detection works but may have edge cases
-- Canvas/WebGL protection detection relies on Brave API which may not be available in all browsers
+- VPN detection is heuristic-based (org name, timezone mismatch)
+- Canvas/WebGL protection detection relies on browser APIs
+- IP geolocation depends on external API availability
 
 ## Future Enhancements (Backlog)
-- [ ] Modularize `privacyTests.js` (currently 1000+ lines)
-- [ ] Add comparison feature with EFF Cover Your Tracks scores
+- [ ] Add comparison with EFF Cover Your Tracks scores
 - [ ] Export results as PDF/JSON
 - [ ] Historical tracking (compare scans over time)
 - [ ] Browser-specific recommendations
+- [ ] WebGL rendering fingerprint (draw-based, not just params)
