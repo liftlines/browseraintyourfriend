@@ -142,34 +142,6 @@ const UniquenessCard = ({ privacyData }) => {
                     </div>
                 </div>
                 
-                {/* Top Exposed Items */}
-                {exposedItems.length > 0 && (
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                            <TrendingUp className="h-4 w-4" />
-                            Exposed Information
-                        </div>
-                        <div className="space-y-2">
-                            {exposedItems.map(([key, data]) => (
-                                <div 
-                                    key={key}
-                                    className="flex items-center justify-between p-2 bg-muted/20 rounded-md"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-destructive" />
-                                        <span className="text-sm text-foreground capitalize">
-                                            {data.description}
-                                        </span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">
-                                        {data.items} item{data.items > 1 ? 's' : ''}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                
                 {/* Simple Explanation */}
                 <div className="text-xs text-muted-foreground border-t border-border pt-4">
                     <p>
