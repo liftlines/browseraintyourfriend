@@ -48,7 +48,7 @@ const Hero = ({ stats, isScanning }) => {
                                             Scanning...
                                         </span>
                                     </>
-                                ) : privacyData ? (
+                                ) : stats ? (
                                     <>
                                         {isGood ? (
                                             <ShieldCheck className="h-8 w-8 text-success mb-1" />
@@ -58,7 +58,7 @@ const Hero = ({ stats, isScanning }) => {
                                         <span className={`text-3xl font-serif font-medium ${
                                             isGood ? 'text-success' : 'text-destructive'
                                         }`}>
-                                            {privacyScore}%
+                                            {protectionScore}%
                                         </span>
                                         <span className="text-xs text-muted-foreground font-sans mt-1">
                                             Privacy Score
