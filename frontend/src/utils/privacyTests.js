@@ -483,13 +483,13 @@ export const testStorage = () => {
         window.localStorage.setItem('test', 'test');
         window.localStorage.removeItem('test');
         localStorage = true;
-    } catch (e) {}
+    } catch (e) { /* localStorage not available */ }
     
     try {
         window.sessionStorage.setItem('test', 'test');
         window.sessionStorage.removeItem('test');
         sessionStorage = true;
-    } catch (e) {}
+    } catch (e) { /* sessionStorage not available */ }
     
     indexedDB = !!window.indexedDB;
     
