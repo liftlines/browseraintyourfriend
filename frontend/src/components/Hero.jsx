@@ -1,10 +1,10 @@
 import React from 'react';
 import { ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react';
 
-const Hero = ({ stats, isScanning, privacyData }) => {
-    // Use privacy score from new system
-    const privacyScore = privacyData?.privacyScore || 0;
-    const isGood = privacyScore >= 50;
+const Hero = ({ stats, isScanning }) => {
+    // Calculate simple protection percentage from stats
+    const protectionScore = stats ? Math.round((stats.safe / stats.total) * 100) : 0;
+    const isGood = protectionScore >= 50;
     
     return (
         <section className="pt-32 pb-16 px-4 sm:px-6 lg:px-8">
