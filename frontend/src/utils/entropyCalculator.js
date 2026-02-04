@@ -289,3 +289,90 @@ export const getRecommendations = (results, privacyData) => {
 
 // Keep old function name for compatibility
 export const calculateEntropy = calculatePrivacyScore;
+
+// Explanations for each test
+export const getTestExplanation = (testId) => {
+    const explanations = {
+        ip: {
+            what: "Your IP address is your unique identifier on the internet.",
+            risk: "Reveals your location, ISP, and can identify you across sessions.",
+            protect: "Use a VPN or Tor to hide your real IP address."
+        },
+        webrtc: {
+            what: "WebRTC enables real-time communication (video calls) in browsers.",
+            risk: "Can leak your real IP address even when using a VPN.",
+            protect: "Disable WebRTC in browser settings or use an extension."
+        },
+        canvas: {
+            what: "Canvas fingerprinting creates a unique image based on your system.",
+            risk: "Your browser's rendering is unique and can identify you.",
+            protect: "Use Brave browser or canvas blocking extensions."
+        },
+        webgl: {
+            what: "WebGL exposes your graphics card information.",
+            risk: "GPU details help create a unique fingerprint of your device.",
+            protect: "Brave browser can protect WebGL information."
+        },
+        audio: {
+            what: "Audio fingerprinting measures how your device processes sound.",
+            risk: "Audio characteristics vary by hardware and create a fingerprint.",
+            protect: "Brave browser protects against audio fingerprinting."
+        },
+        fonts: {
+            what: "Websites can detect which fonts you have installed.",
+            risk: "Your font collection is often unique to your system.",
+            protect: "Firefox can limit font enumeration."
+        },
+        javascript: {
+            what: "JavaScript reveals browser and system details.",
+            risk: "User agent, platform, and hardware info help identify your device.",
+            protect: "Some browsers can spoof or limit this information."
+        },
+        screen: {
+            what: "Your screen resolution is visible to websites.",
+            risk: "Unusual resolutions make you more identifiable.",
+            protect: "Using common resolutions reduces uniqueness."
+        },
+        timezone: {
+            what: "Your system timezone is visible to websites.",
+            risk: "Reveals your general geographic region.",
+            protect: "Tor Browser normalizes timezone to UTC."
+        },
+        dnt: {
+            what: "Do Not Track signals your preference not to be tracked.",
+            risk: "Most websites ignore this signal.",
+            protect: "Enable Global Privacy Control (GPC) for legal backing."
+        },
+        storage: {
+            what: "Storage APIs allow websites to save data in your browser.",
+            risk: "Enables persistent tracking across sessions.",
+            protect: "Clear cookies and storage regularly."
+        },
+        geolocation: {
+            what: "Geolocation API can request your precise GPS coordinates.",
+            risk: "If granted, websites know your exact physical location.",
+            protect: "Deny location requests unless absolutely necessary."
+        },
+        media: {
+            what: "Websites can count your cameras and microphones.",
+            risk: "Device configuration helps identify your system.",
+            protect: "Deny media access when not needed."
+        },
+        adBlocker: {
+            what: "Websites can detect if you use an ad blocker.",
+            risk: "Ad blocker usage adds to your fingerprint.",
+            protect: "Keep using it - privacy benefits outweigh fingerprinting."
+        },
+        clientHints: {
+            what: "Client Hints provide detailed browser info to servers.",
+            risk: "Reveals browser version, platform, and device details.",
+            protect: "Some browsers allow limiting client hints."
+        }
+    };
+    
+    return explanations[testId] || {
+        what: "This test checks a browser feature that can be used for tracking.",
+        risk: "The information exposed can contribute to browser fingerprinting.",
+        protect: "Consider using a privacy-focused browser."
+    };
+};
