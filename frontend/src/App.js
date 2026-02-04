@@ -5,9 +5,40 @@ import Hero from '@/components/Hero';
 import ResultsGrid from '@/components/ResultsGrid';
 import RecommendationsCard from '@/components/RecommendationsCard';
 import Footer from '@/components/Footer';
+import AdminPage from '@/components/AdminPage';
 import { runAllTests } from '@/utils/privacyTests';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
+// Track visit (called once per session)
+const trackVisit = async () => {
+    try {
+        // Check if already tracked this session
+        if (sessionStorage.getItem('visit_tracked')) return;
+        
+        await fetch(`${API_URL}/api/analytics/visit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        sessionStorage.setItem('visit_tracked', 'true');
+    } catch (e) {
+        // Silent fail - don't disrupt user experience
+    }
+};
+
+// Track CTA click
+export const trackCtaClick = async () => {
+    try {
+        await fetch(`${API_URL}/api/analytics/cta-click`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (e) {
+        // Silent fail
+    }
+};
 
 const HomePage = () => {
     const [results, setResults] = useState(null);
@@ -63,6 +94,8 @@ const HomePage = () => {
     }, [calculateStats]);
     
     useEffect(() => {
+        // Track visit on mount
+        trackVisit();
         // Run scan on mount
         runScan();
     }, [runScan]);
@@ -100,6 +133,7 @@ function App() {
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<HomePage />} />
+                <Route path="/admin" element={<AdminPage />} />
             </Routes>
         </BrowserRouter>
     );
